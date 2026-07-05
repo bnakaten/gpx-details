@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { AnalysisResponse, AnalysisSettings, GPXPoint, GPXStop } from '../types';
 import { DEMO_GPX_XML } from '../demoGPX';
 import { UploadForm } from '../components/UploadForm';
@@ -95,6 +96,17 @@ export default function HomePage() {
 
               The app originally started as a side project to better understand and analyze the movement patterns and riding behavior of Three Peaks riders.
             </p>
+            <div className="pt-1">
+              <a
+                href="https://cycling-breaks.onrender.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[11px] text-[#2563EB] hover:underline"
+              >
+                <ExternalLink size={12} />
+                cycling-breaks.onrender.com
+              </a>
+            </div>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
               <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">
                 Adjustable minimum duration
