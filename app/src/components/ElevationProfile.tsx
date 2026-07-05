@@ -227,7 +227,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ points, tota
       >
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         <TrendingUp size={14} className="text-[#2563EB]" />
-        Höhenprofil
+        Elevation Profile
         <span className="text-[10px] text-[#6B7280] font-normal ml-auto">
           {minEle.toFixed(0)} – {maxEle.toFixed(0)} m &middot; {(totalDistanceMeters / 1000).toFixed(1)} km
         </span>
@@ -236,14 +236,14 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ points, tota
       {open && (
         <div className="px-4 pb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] text-[#6B7280]">Ziehen zum Zoomen &middot; Doppelklick zum Zurücksetzen</span>
+            <span className="text-[10px] text-[#6B7280]">Drag to zoom &middot; Double-click to reset</span>
             {zoom && (
               <button
                 onClick={resetZoom}
                 className="inline-flex items-center gap-1 text-[10px] text-[#2563EB] hover:text-blue-700 font-medium cursor-pointer"
               >
                 <RotateCcw size={10} />
-                Zurücksetzen
+                Reset
               </button>
             )}
           </div>

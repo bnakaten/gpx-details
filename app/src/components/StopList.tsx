@@ -109,9 +109,9 @@ export function StopList({ points, stops, selectedStop, onStopSelect }: StopList
         <div className="w-9 h-9 rounded bg-[#F9FAFB] flex items-center justify-center text-slate-400 mb-2 border border-[#E5E7EB]">
           <Clock size={16} />
         </div>
-        <p className="text-xs font-semibold text-slate-800">Keine Segmente erkannt</p>
+        <p className="text-xs font-semibold text-slate-800">No segments detected</p>
         <p className="text-[11px] text-[#6B7280] max-w-xs mt-1 leading-relaxed">
-          Passe die Parameter an oder lade eine andere GPX-Spur hoch.
+          Adjust your parameters or upload a different GPX track.
         </p>
       </div>
     );
@@ -122,10 +122,10 @@ export function StopList({ points, stops, selectedStop, onStopSelect }: StopList
       <div className="px-5 py-3 border-b border-[#E5E7EB] flex items-center justify-between bg-[#F9FAFB]">
         <h3 className="text-xs font-bold text-[#111827] uppercase tracking-wider flex items-center gap-2">
           <MapPin size={14} className="text-[#2563EB]" />
-          Segmente & Details ({segments.length})
+          Segments & Details ({segments.length})
         </h3>
         <span className="text-[10px] text-[#6B7280]">
-          Zeile anklicken zum Fokussieren
+          Click row to focus
         </span>
       </div>
 
@@ -139,7 +139,7 @@ export function StopList({ points, stops, selectedStop, onStopSelect }: StopList
                 onClick={() => handleSort('index')}
               >
                 <div className="flex items-center gap-1">
-                  Nr. <ArrowUpDown size={10} />
+                  No. <ArrowUpDown size={10} />
                 </div>
               </th>
 
@@ -148,18 +148,18 @@ export function StopList({ points, stops, selectedStop, onStopSelect }: StopList
                 onClick={() => handleSort('startTime')}
               >
                 <div className="flex items-center gap-1">
-                  Startzeit <ArrowUpDown size={10} />
+                  Start <ArrowUpDown size={10} />
                 </div>
               </th>
 
-              <th className="py-3 px-4 text-[#6B7280]">Endzeit</th>
+              <th className="py-3 px-4 text-[#6B7280]">End</th>
 
               <th 
                 className="py-3 px-4 cursor-pointer hover:bg-slate-50 hover:text-slate-800 transition"
                 onClick={() => handleSort('durationMs')}
               >
                 <div className="flex items-center gap-1">
-                  Dauer <ArrowUpDown size={10} />
+                  Duration <ArrowUpDown size={10} />
                 </div>
               </th>
 
@@ -174,7 +174,7 @@ export function StopList({ points, stops, selectedStop, onStopSelect }: StopList
 
               <th className="py-3 px-4 text-[#6B7280]">
                 <div className="flex items-center gap-1">
-                  Höhenm.
+                  Elev.
                 </div>
               </th>
 
@@ -183,7 +183,7 @@ export function StopList({ points, stops, selectedStop, onStopSelect }: StopList
                 onClick={() => handleSort('pointCount')}
               >
                 <div className="flex items-center gap-1">
-                  Punkte <ArrowUpDown size={10} />
+                  Points <ArrowUpDown size={10} />
                 </div>
               </th>
             </tr>
