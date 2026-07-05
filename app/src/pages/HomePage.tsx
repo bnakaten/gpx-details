@@ -89,9 +89,7 @@ export default function HomePage() {
               Analyze stop times from recorded GPX routes
             </h2>
             <p className="text-xs text-[#6B7280] leading-relaxed">
-              This application lets you upload GPS data paths and search them in detail for
-              stop times (stays/stops). The algorithm filters out GPS jitter,
-              removes signal outliers, and lists all rest phases in a table as well as visualizes them on an interactive OSM map.
+              Upload a GPX track and detect every stop along the route. The algorithm filters out GPS jitter, removes signal outliers, and presents all rest phases in a clear table alongside an interactive map visualization.
             </p>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
               <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">
