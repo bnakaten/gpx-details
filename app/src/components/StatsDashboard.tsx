@@ -34,12 +34,12 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
     const displayMinutes = minutes % 60;
 
     if (hours > 0) {
-      return `${hours} Std. ${displayMinutes} Min. ${displaySeconds} Sek.`;
+      return `${hours}h ${displayMinutes}m ${displaySeconds}s`;
     }
     if (minutes > 0) {
-      return `${displayMinutes} Min. ${displaySeconds} Sek.`;
+      return `${displayMinutes}m ${displaySeconds}s`;
     }
-    return `${displaySeconds} Sek.`;
+    return `${displaySeconds}s`;
   };
   const formatTrackDuration = (ms: number): string => {
     const seconds = Math.floor(ms / 1000);
@@ -50,14 +50,14 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
     const displayMinutes = minutes % 60;
 
     if (hours > 0) {
-      return `${hours} Std. ${displayMinutes} Min.`;
+      return `${hours}h ${displayMinutes}m`;
     }
-    return `${displayMinutes} Min. ${displaySeconds} Sek.`;
+    return `${displayMinutes}m ${displaySeconds}s`;
   };
 
   return (
     <div className="grid grid-cols-1 gap-4">
-      {/* 1. Bewegung & Standzeit */}
+      {/* 1. Movement & Standing Time */}
       <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 flex items-start gap-3.5">
         <div className="p-2.5 bg-slate-50 rounded text-slate-600 flex-shrink-0">
           <Clock size={18} />
@@ -70,10 +70,10 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
                   <Bike size={12} className="text-emerald-600" />
                 </td>
                 <td className="w-[100px] pb-1.5 align-middle">
-                  <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">In Bewegung</span>
+                  <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">In Motion</span>
                 </td>
                 <td className="w-[80px] pb-1.5 align-middle">
-                  <span className="text-[10px] text-[#6B7280]">{movementSegmentCount} Segmente</span>
+                  <span className="text-[10px] text-[#6B7280]">{movementSegmentCount} Segments</span>
                 </td>
                 <td className="w-[45px] pb-1.5 align-middle">
                   <span className="text-[10px] text-[#6B7280]">{movementPercent.toFixed(0)}%</span>
@@ -88,10 +88,10 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
                   <Moon size={12} className="text-indigo-500" />
                 </td>
                 <td className="w-[100px] pt-1.5 align-middle">
-                  <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Standzeit</span>
+                  <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Standing</span>
                 </td>
                 <td className="w-[80px] pt-1.5 align-middle">
-                  <span className="text-[10px] text-[#6B7280]">{summary.stopCount} Stopps</span>
+                  <span className="text-[10px] text-[#6B7280]">{summary.stopCount} Stops</span>
                 </td>
                 <td className="w-[45px] pt-1.5 align-middle">
                   <span className="text-[10px] text-[#6B7280]">{summary.stopRatioPercent}%</span>
@@ -105,24 +105,24 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
         </div>
       </div>
 
-      {/* 2. Streckendetails (Distance & Duration) */}
+      {/* 2. Route Details (Distance & Duration) */}
       <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 flex items-start gap-3.5">
         <div className="p-2.5 bg-slate-50 rounded text-slate-600 flex-shrink-0">
           <Navigation size={18} />
         </div>
         <div className="min-w-0 w-full">
-          <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Streckendetails</p>
+          <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Route Details</p>
           <div className="flex gap-x-4 mt-1.5 text-xs">
             <div>
-              <p className="text-[10px] text-[#6B7280]">Distanz:</p>
+              <p className="text-[10px] text-[#6B7280]">Distance:</p>
               <p className="font-bold text-slate-800 font-mono mt-0.5 text-sm">{distanceKm} km</p>
             </div>
             <div>
-              <p className="text-[10px] text-[#6B7280]">Höhenm.:</p>
+              <p className="text-[10px] text-[#6B7280]">Elevation:</p>
               <p className="font-bold text-slate-800 font-mono mt-0.5 text-sm">{summary.totalElevationGainM} m</p>
             </div>
             <div className="ml-auto text-right">
-              <p className="text-[10px] text-[#6B7280]">Dauer:</p>
+              <p className="text-[10px] text-[#6B7280]">Duration:</p>
               <p className="font-semibold text-slate-800 font-mono mt-0.5" title={formatTrackDuration(summary.totalTrackDurationMs)}>
                 {formatTrackDuration(summary.totalTrackDurationMs)}
               </p>
@@ -131,7 +131,7 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
           {summary.filteredPointsCount > 0 && (
             <div className="mt-2 flex items-center gap-1 text-[9px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded w-fit">
               <ShieldAlert size={9} />
-              <span>{summary.filteredPointsCount} Sprünge gefiltert</span>
+              <span>{summary.filteredPointsCount} outliers filtered</span>
             </div>
           )}
         </div>

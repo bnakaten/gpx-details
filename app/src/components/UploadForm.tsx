@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AnalysisSettings, DetectionMethod } from '../types';
-import { Upload, FileCode, Sliders, ChevronDown, ChevronUp, AlertCircle, HelpCircle, Clock } from 'lucide-react';
+import { Upload, FileCode, Sliders, ChevronDown, ChevronUp, AlertCircle, HelpCircle, Clock, ExternalLink, X } from 'lucide-react';
 
 interface UploadFormProps {
   onAnalyze: (content: string, filename: string, settings: AnalysisSettings) => void;
@@ -29,7 +29,8 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
   });
 
   // Advanced section collapses
-  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(true);
+  const [showGoogleApiHelp, setShowGoogleApiHelp] = useState<boolean>(false);
 
   // Cutoff timestamp (fixed even when other params change)
   const [cutoffTime, setCutoffTime] = useState<string>('2026-07-04T12:50');
@@ -66,7 +67,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
   const processFile = (file: File) => {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.gpx') && !file.name.toLowerCase().endsWith('.xml')) {
-      alert('Bitte lade nur gültige GPX-Dateien hoch (.gpx).');
+      alert('Please only upload valid GPX files (.gpx).');
       return;
     }
 
@@ -146,11 +147,30 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
         <div>
           <h2 className="text-xs font-bold text-[#111827] uppercase tracking-wider flex items-center gap-2">
             <Sliders size={14} className="text-[#2563EB]" />
-            Parameter & Datei
+            Parameters & Datei
           </h2>
           <p className="text-[11px] text-[#6B7280] mt-1.5 leading-relaxed">
-            Konfiguriere Grenzwerte und lade dein GPX-Protokoll zur Stopp-Erkennung.
+            Configure thresholds and upload your GPX log for stop detection.
           </p>
+        </div>
+
+        {/* Trigger Button */}
+        <div className="border-b border-[#E5E7EB] pb-4">
+          <button
+            onClick={handleSubmit}
+            disabled={!uploadedFile || isLoading}
+            className={`w-full py-2.5 px-4 rounded font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer ${
+              uploadedFile && !isLoading
+                ? 'bg-[#2563EB] text-white hover:bg-blue-700'
+                : 'bg-[#F9FAFB] text-slate-300 border border-[#E5E7EB] cursor-not-allowed'
+            }`}
+          >
+            {isLoading ? (
+              <span>Analyzing...</span>
+            ) : (
+              <span>Start Analysis</span>
+            )}
+          </button>
         </div>
 
         {/* Drag and Drop Zone */}
@@ -188,13 +208,13 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
                 <p className="text-[10px] text-slate-400 mt-0.5">{uploadedFile.size}</p>
               </div>
               <span className="inline-block text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold mt-1">
-                Ersetzen
+                    Replace
               </span>
             </div>
           ) : (
             <div className="space-y-1 my-2 pointer-events-none">
-              <p className="text-xs font-semibold text-[#111827]">GPX Datei hier ablegen</p>
-              <p className="text-[11px] text-[#6B7280]">oder klicken zum Auswählen</p>
+              <p className="text-xs font-semibold text-[#111827]">Drop GPX file here</p>
+              <p className="text-[11px] text-[#6B7280]">or click to select</p>
             </div>
           )}
         </div>
@@ -203,10 +223,10 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
         <div className="space-y-2 p-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">
             <Clock size={12} />
-            Start-Zeitstempel
+            Start Timestamp
           </div>
           <p className="text-[10px] text-[#6B7280] leading-relaxed">
-            Nur Daten nach diesem Zeitpunkt-1 Minute werden analysiert.
+            Only data after this point in time minus 1 minute will be analyzed.
             {savedCutoffMs && (
               <span className="block mt-0.5 text-[#2563EB] font-semibold">
                 Gespeichert: {new Date(savedCutoffMs).toLocaleString('de-DE')}
@@ -225,7 +245,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
               onClick={handleSaveCutoff}
               className="shrink-0 px-3 py-1.5 bg-[#2563EB] text-white rounded text-[10px] font-semibold uppercase tracking-wider hover:bg-blue-700 transition cursor-pointer"
             >
-              Speichern
+                            Save
             </button>
           </div>
         </div>
@@ -236,10 +256,10 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
           <div className="flex flex-col gap-1.5">
             <div className="flex justify-between items-center text-[11px]">
               <label htmlFor="min-duration" className="font-semibold text-[#6B7280] uppercase tracking-wider">
-                Mindestdauer
+                        Minimum Duration
               </label>
               <span className="font-mono font-bold text-[#2563EB]">
-                {minDurationMinutes} Min.
+                {minDurationMinutes}  min
               </span>
             </div>
             <input 
@@ -258,7 +278,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
           <div className="flex flex-col gap-1.5">
             <div className="flex justify-between items-center text-[11px]">
               <label htmlFor="max-radius" className="font-semibold text-[#6B7280] uppercase tracking-wider">
-                Maximaler Radius
+                        Maximum Radius
               </label>
               <span className="font-mono font-bold text-[#2563EB]">
                 {maxRadiusMeters} m
@@ -279,7 +299,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
           {/* Method Selector */}
           <div>
             <label className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block mb-2">
-              Erkennungsmethode
+                        Detection Method
             </label>
             <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#F9FAFB] border border-[#E5E7EB] rounded">
               {(['distance', 'speed', 'hybrid'] as const).map((method) => (
@@ -293,7 +313,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
                       : 'text-slate-400 hover:text-slate-600'
                   }`}
                 >
-                  {method === 'distance' ? 'Distanz' : method === 'speed' ? 'Tempo' : 'Hybrid'}
+                  {method === 'distance' ? 'Distance' : method === 'speed' ? 'Speed' : 'Hybrid'}
                 </button>
               ))}
             </div>
@@ -306,7 +326,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="w-full flex items-center justify-between text-[11px] text-[#6B7280] hover:text-slate-800 font-semibold uppercase tracking-wider cursor-pointer"
             >
-              <span>Optionen</span>
+              <span>Options</span>
               {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
 
@@ -322,10 +342,10 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
                   />
                   <div className="min-w-0">
                     <span className="font-semibold text-slate-700">
-                      GPS-Ausreißer filtern
+                      Filter GPS Outliers
                     </span>
                     <p className="text-[10px] text-[#6B7280] leading-normal">
-                      Eliminiert plötzliche Tracking-Fehlersprünge.
+                      Eliminates sudden tracking error jumps.
                     </p>
                   </div>
                 </label>
@@ -340,10 +360,10 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
                   />
                   <div className="min-w-0">
                     <span className="font-semibold text-slate-700">
-                      Bewegungen tolerieren
+                      Tolerate Movements
                     </span>
                     <p className="text-[10px] text-[#6B7280] leading-normal">
-                      Toleriert kurzfristige Ausschläge innerhalb Stopps.
+                      Tolerates short-term excursions within stops.
                     </p>
                   </div>
                 </label>
@@ -358,10 +378,18 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
                   />
                   <div className="min-w-0">
                     <span className="font-semibold text-slate-700">
-                      Map Matching (Rennrad)
+                      Map Matching (Road Bike)
+                      <button
+                        type="button"
+                        title="How to get a Google Roads API key"
+                        onClick={(e) => { e.preventDefault(); setShowGoogleApiHelp(true); }}
+                        className="ml-1 text-[#9CA3AF] hover:text-[#2563EB] transition cursor-pointer align-middle"
+                      >
+                        <HelpCircle size={12} />
+                      </button>
                     </span>
                     <p className="text-[10px] text-[#6B7280] leading-normal">
-                      Gleicht GPS-Punkte via Google Roads API an Straßen an.
+                      Snaps GPS points to roads via Google Roads API.
                     </p>
                   </div>
                 </label>
@@ -380,10 +408,10 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
                     <label className="flex flex-col gap-1.5 text-xs mt-2">
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-slate-700">
-                          Punktverdichtung
+                          Point Densification
                         </span>
                         <span className="font-mono font-bold text-[#2563EB]">
-                          {densifyIntervalM === 0 ? 'Aus' : `${densifyIntervalM}m`}
+                          {densifyIntervalM === 0 ? 'Off' : `${densifyIntervalM}m`}
                         </span>
                       </div>
                       <input
@@ -396,7 +424,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
                         className="w-full accent-[#2563EB] h-1.5"
                       />
                         <p className="text-[10px] text-[#6B7280] leading-normal">
-                          Stützpunktabstand vor Map Matching (50m–1km).
+                          Control point spacing before Map Matching (50m–1km).
                         </p>
                     </label>
                   </div>
@@ -414,24 +442,39 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
         )}
       </form>
 
-      {/* Trigger Button */}
-      <div className="mt-6 border-t border-[#E5E7EB] pt-4">
-        <button
-          onClick={handleSubmit}
-          disabled={!uploadedFile || isLoading}
-          className={`w-full py-2.5 px-4 rounded font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer ${
-            uploadedFile && !isLoading
-              ? 'bg-[#2563EB] text-white hover:bg-blue-700'
-              : 'bg-[#F9FAFB] text-slate-300 border border-[#E5E7EB] cursor-not-allowed'
-          }`}
+      {/* Google Roads API Key Help Dialog */}
+      {showGoogleApiHelp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={() => setShowGoogleApiHelp(false)}
         >
-          {isLoading ? (
-            <span>Wird analysiert...</span>
-          ) : (
-            <span>Analyse starten</span>
-          )}
-        </button>
-      </div>
+          <div
+            className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-[#111827]">Google Roads API Key</h3>
+              <button
+                type="button"
+                onClick={() => setShowGoogleApiHelp(false)}
+                className="text-[#9CA3AF] hover:text-[#111827] transition cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <p className="text-xs font-semibold text-[#111827] mb-2">Quick setup guide</p>
+            <ol className="text-xs text-[#6B7280] space-y-2 list-decimal list-inside leading-relaxed">
+              <li>Open the <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" className="text-[#2563EB] underline">Google Cloud Console</a>.</li>
+              <li>Create a project or select an existing one.</li>
+              <li>Go to the API Library, search for <strong>Roads API</strong>, and click <strong>Enable</strong>.</li>
+              <li>Under <strong>Credentials</strong>, create an API key.</li>
+            </ol>
+            <p className="text-xs text-[#6B7280] mt-2 leading-relaxed">
+              <strong>Security recommendation:</strong> Restrict the key in the settings (API restriction to "Roads API") to prevent unauthorized use by third parties.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

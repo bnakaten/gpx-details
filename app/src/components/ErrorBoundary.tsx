@@ -45,9 +45,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h3 className="text-sm font-bold text-[#111827] mb-2">Etwas ist schiefgelaufen</h3>
+          <h3 className="text-sm font-bold text-[#111827] mb-2">Something went wrong</h3>
           <p className="text-[11px] text-[#6B7280] mb-4 max-w-xs">
-            Beim Rendern der Karte ist ein Fehler aufgetreten.
+            An error occurred while rendering the map.
           </p>
           {this.state.error && (
             <p className="text-[10px] text-red-600 font-mono bg-red-50 px-3 py-2 rounded mb-4 max-w-xs">
@@ -58,7 +58,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             onClick={this.handleReset}
             className="text-[11px] bg-[#2563EB] hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold transition"
           >
-            Erneut versuchen
+            Try again
           </button>
         </div>
       );

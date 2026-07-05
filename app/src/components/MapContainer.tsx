@@ -62,7 +62,7 @@ export function MapContainer({ points, rawPoints, stops, selectedStop, onStopSel
             <label style="display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer;user-select:none;">
               <input type="checkbox" id="legend-raw" checked style="accent-color:#ef4444;">
               <span style="display:inline-block;width:24px;height:3px;background:#ef4444;border-radius:2px;opacity:0.6;flex-shrink:0;"></span>
-              <span>Original-GPX</span>
+              <span>    Original GPX</span>
             </label>
           `;
           L.DomEvent.on(div.querySelector('#legend-google')!, 'change', (e: Event) => {
@@ -200,21 +200,21 @@ export function MapContainer({ points, rawPoints, stops, selectedStop, onStopSel
       })
         .bindPopup(`
           <div class="font-sans text-xs p-2 bg-white rounded shadow-lg max-w-[200px]">
-            <div class="font-bold text-rose-700 text-sm mb-2">Stopp #${index + 1}</div>
+            <div class="font-bold text-rose-700 text-sm mb-2">Stop #${index + 1}</div>
             <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-gray-700">
-              <span class="font-medium text-gray-500">Dauer:</span>
+              <span class="font-medium text-gray-500">Duration:</span>
               <span class="font-bold text-gray-900">${stop.durationFormatted}</span>
               <span class="font-medium text-gray-500">Start:</span>
               <span>${new Date(stop.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-              <span class="font-medium text-gray-500">Ende:</span>
+              <span class="font-medium text-gray-500">End:</span>
               <span>${new Date(stop.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-              <span class="font-medium text-gray-500">Streuung:</span>
+              <span class="font-medium text-gray-500">Dispersion:</span>
               <span>&le; ${stop.maxDistanceDelta} m</span>
-              <span class="font-medium text-gray-500">Punkte:</span>
+              <span class="font-medium text-gray-500">Points:</span>
               <span>${stop.pointCount}</span>
             </div>
             <button id="btn-popup-${stop.id}" class="w-full mt-3 bg-rose-600 text-white rounded py-2 px-3 font-semibold hover:bg-rose-700 transition text-xs cursor-pointer">
-              In Liste auswählen
+              Select in list
             </button>
           </div>
         `)
@@ -327,9 +327,9 @@ export function MapContainer({ points, rawPoints, stops, selectedStop, onStopSel
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
             </svg>
           </div>
-          <p className="text-xs font-semibold text-slate-800">Keine Karte verfügbar</p>
+          <p className="text-xs font-semibold text-slate-800">No map available</p>
           <p className="text-[11px] text-[#6B7280] max-w-xs mt-1 leading-relaxed">
-            Lade eine GPX-Datei hoch, um den Streckenverlauf und die erkannten Standzeiten anzuzeigen.
+            Upload a GPX file to display the route and detected stops.
           </p>
         </div>
       )}
