@@ -132,11 +132,150 @@ export function parseGPX(xmlContent: string): GPXPoint[] {
   return points;
 }
 
-// Complete Analyze function
-export function analyzeGPXData(xmlContent: string, settings: AnalysisSettings): AnalysisResponse {
+function densifyPoints(points: GPXPoint[], intervalM: number): GPXPoint[] {
+  if (points.length < 2 || intervalM <= 0) return points;
+
+  const result: GPXPoint[] = [points[0]];
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const dist = calculateDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+
+    if (dist <= intervalM) {
+      result.push(curr);
+      continue;
+    }
+
+    const steps = Math.round(dist / intervalM);
+    const duration = curr.timestampMs - prev.timestampMs;
+    const eleA = prev.ele ?? 0;
+    const eleB = curr.ele ?? 0;
+
+    for (let s = 1; s <= steps; s++) {
+      const frac = s / steps;
+      result.push({
+        lat: prev.lat + frac * (curr.lat - prev.lat),
+        lon: prev.lon + frac * (curr.lon - prev.lon),
+        ele: eleA + frac * (eleB - eleA),
+        time: new Date(Math.round(prev.timestampMs + frac * duration)).toISOString(),
+        timestampMs: Math.round(prev.timestampMs + frac * duration),
+      });
+    }
+  }
+
+  return result;
+}
+
+async function matchPointsToRoad(points: GPXPoint[], apiKey: string): Promise<GPXPoint[]> {
+  const BATCH_SIZE = 100;
+  const matched: GPXPoint[] = [];
+
+  for (let batchStart = 0; batchStart < points.length; batchStart += BATCH_SIZE) {
+    const batch = points.slice(batchStart, batchStart + BATCH_SIZE);
+    if (batch.length < 2) {
+      for (const p of batch) matched.push({ ...p });
+      continue;
+    }
+
+    const path = batch.map(p => `${p.lat},${p.lon}`).join('|');
+    const url = `https://roads.googleapis.com/v1/snapToRoads?path=${path}&interpolate=true&key=${apiKey}`;
+
+    try {
+      console.log(`[Google Roads] batch ${batchStart}-${Math.min(batchStart + BATCH_SIZE, points.length)}: ${batch.length} points`);
+      const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (!response.ok) {
+        let body = '';
+        try { body = await response.text(); } catch { /* ignore */ }
+        console.error(`[Google Roads] HTTP ${response.status}:`, body.slice(0, 300));
+        throw new Error(`HTTP ${response.status}: ${body.slice(0, 200)}`);
+      }
+      const rawData = await response.json();
+      if (rawData.error) {
+        console.error('[Google Roads] API error:', JSON.stringify(rawData.error));
+        throw new Error(`API error: ${rawData.error.message || JSON.stringify(rawData.error)}`);
+      }
+      const data = rawData as { snappedPoints?: Array<{ location: { latitude: number; longitude: number }; originalIndex: number }> };
+      console.log(`[Google Roads] batch ${batchStart}: got ${data.snappedPoints?.length || 0} snapped points`);
+      if (!data.snappedPoints || data.snappedPoints.length === 0) throw new Error('No snapped points returned');
+
+      const resultPts: Array<{ lat: number; lon: number; originalIndex: number }> = [];
+      let currentOi = -1;
+      for (const sp of data.snappedPoints) {
+        if (sp.originalIndex != null) currentOi = sp.originalIndex;
+        if (currentOi < 0) continue;
+        resultPts.push({ lat: sp.location.latitude, lon: sp.location.longitude, originalIndex: currentOi });
+      }
+
+      const groups = new Map<number, Array<{ lat: number; lon: number }>>();
+      for (const pt of resultPts) {
+        const arr = groups.get(pt.originalIndex);
+        if (arr) arr.push(pt);
+        else groups.set(pt.originalIndex, [pt]);
+      }
+
+      const sortedIndices = [...groups.keys()].sort((a, b) => a - b);
+
+      for (let gi = 0; gi < sortedIndices.length; gi++) {
+        const oi = sortedIndices[gi];
+        const groupPts = groups.get(oi)!;
+        const nextOi = gi < sortedIndices.length - 1 ? sortedIndices[gi + 1] : -1;
+
+        const prevOi = gi > 0 ? sortedIndices[gi - 1] : -1;
+        for (let rawIdx = prevOi + 1; rawIdx < oi; rawIdx++) {
+          if (batch[rawIdx]) matched.push({ ...batch[rawIdx] });
+        }
+
+        const startInput = batch[oi];
+        if (!startInput) {
+          for (const pt of groupPts) {
+            matched.push({ ...batch[0], lat: pt.lat, lon: pt.lon });
+          }
+          continue;
+        }
+
+        if (nextOi < 0 || !batch[nextOi]) {
+          for (const pt of groupPts) {
+            matched.push({ ...startInput, lat: pt.lat, lon: pt.lon });
+          }
+          continue;
+        }
+
+        const endInput = batch[nextOi];
+        const duration = endInput.timestampMs - startInput.timestampMs;
+        const eleA = startInput.ele ?? 0;
+        const eleB = endInput.ele ?? 0;
+
+        for (let pi = 0; pi < groupPts.length; pi++) {
+          const frac = groupPts.length <= 1 ? 1 : pi / (groupPts.length - 1);
+          const ts = Math.round(startInput.timestampMs + frac * duration);
+          matched.push({
+            lat: groupPts[pi].lat,
+            lon: groupPts[pi].lon,
+            ele: eleA + frac * (eleB - eleA),
+            time: new Date(ts).toISOString(),
+            timestampMs: ts,
+          });
+        }
+      }
+
+      const lastOi = sortedIndices.length > 0 ? sortedIndices[sortedIndices.length - 1] : -1;
+      for (let rawIdx = lastOi + 1; rawIdx < batch.length; rawIdx++) {
+        matched.push({ ...batch[rawIdx] });
+      }
+    } catch (err) {
+      console.warn(`Google snapToRoad batch ${batchStart}-${batchStart + batch.length} failed:`, err);
+      for (const p of batch) matched.push({ ...p });
+    }
+  }
+
+  return matched;
+}
+
+export async function analyzeGPXData(xmlContent: string, settings: AnalysisSettings): Promise<AnalysisResponse> {
   try {
-    const rawPoints = parseGPX(xmlContent);
-    if (rawPoints.length === 0) {
+    const parsedPoints = parseGPX(xmlContent);
+    if (parsedPoints.length === 0) {
       return {
         success: false,
         error: "Keine gültigen Trackpunkte mit Zeitstempel im GPX-Dokument gefunden.",
@@ -146,10 +285,11 @@ export function analyzeGPXData(xmlContent: string, settings: AnalysisSettings): 
       };
     }
 
-    // 1. Filter points by cutoff timestamp (drop everything before cutoffTimestampMs - 1 minute)
+    // 0. Apply cutoff timestamp to parsed points
+    let displayPoints = parsedPoints;
     if (settings.cutoffTimestampMs !== undefined && settings.cutoffTimestampMs > 0) {
-      const minTimestamp = settings.cutoffTimestampMs - 60000; // 1 minute before cutoff
-      const filtered = rawPoints.filter((p) => p.timestampMs >= minTimestamp);
+      const minTimestamp = settings.cutoffTimestampMs - 60000;
+      const filtered = parsedPoints.filter((p) => p.timestampMs >= minTimestamp);
       if (filtered.length === 0) {
         return {
           success: false,
@@ -159,22 +299,35 @@ export function analyzeGPXData(xmlContent: string, settings: AnalysisSettings): 
           summary: createEmptySummary(),
         };
       }
-      rawPoints.length = 0;
-      rawPoints.push(...filtered);
+      displayPoints = filtered;
     }
 
-    // 2. Calculate step differentials and filter outliers if enabled
+    // 1. Map matching (optional)
+    let matchedPoints: GPXPoint[] | undefined;
+    if (settings.enableMapMatching && settings.googleApiKey) {
+      const densifyInterval = settings.densifyIntervalM ?? 0;
+      const inputForMatching = densifyInterval > 0 ? densifyPoints(displayPoints, densifyInterval) : displayPoints;
+      matchedPoints = await matchPointsToRoad(inputForMatching, settings.googleApiKey);
+    }
+
+    // Analysis runs on matched (Google) points if available, otherwise original
+    const analysisInput = matchedPoints ?? displayPoints;
+
+    // If matching was done, displayPoints are the raw GPX for comparison
+    const rawPoints = matchedPoints ? displayPoints : undefined;
+
+    // 2. Filter outliers and calculate step differentials
     let points: GPXPoint[] = [];
     let filteredOutliersCount = 0;
     
     // Max human track speed on highways/trains can be high, but let's filter extreme outliers (e.g. > 180 km/h or 50 m/s)
     const MAX_SPEED_LIMIT_MS = 50; // 180 km/h
 
-    for (let i = 0; i < rawPoints.length; i++) {
-      const curr = { ...rawPoints[i] };
+    for (let i = 0; i < analysisInput.length; i++) {
+      const curr = { ...analysisInput[i] };
       
       if (i > 0) {
-        const prev = points[points.length - 1] || rawPoints[i - 1];
+        const prev = points[points.length - 1] || analysisInput[i - 1];
         const dist = calculateDistance(prev.lat, prev.lon, curr.lat, curr.lon);
         const timeDiff = (curr.timestampMs - prev.timestampMs) / 1000; // seconds
 
@@ -207,7 +360,7 @@ export function analyzeGPXData(xmlContent: string, settings: AnalysisSettings): 
 
     // Check if points are still available after outlier filtering
     if (points.length === 0) {
-      points = [...rawPoints]; // fallback to raw points
+      points = [...analysisInput]; // fallback to analysis input
     }
 
     // Adjust first point cumulative if we skipped some
@@ -457,13 +610,23 @@ export function analyzeGPXData(xmlContent: string, settings: AnalysisSettings): 
     const totalTrackDurationMs = lastPt.timestampMs - firstPt.timestampMs;
     const totalDistance = lastPt.cumulativeDistance || 0;
 
+    let totalElevationGain = 0;
+    for (let i = 1; i < points.length; i++) {
+      const prevEle = points[i - 1].ele;
+      const currEle = points[i].ele;
+      if (prevEle !== undefined && currEle !== undefined && currEle > prevEle) {
+        totalElevationGain += currEle - prevEle;
+      }
+    }
+
     const summary: AnalysisSummary = {
       totalStopDurationMs: totalStopMs,
       totalStopDurationFormatted: formatDuration(totalStopMs),
       totalTrackDurationMs,
-      totalPoints: rawPoints.length,
+      totalPoints: analysisInput.length,
       filteredPointsCount: filteredOutliersCount,
       totalDistanceMeters: Math.round(totalDistance),
+      totalElevationGainM: Math.round(totalElevationGain),
       stopCount: stops.length,
       stopRatioPercent: totalTrackDurationMs > 0 ? Math.round((totalStopMs / totalTrackDurationMs) * 100) : 0,
     };
@@ -471,6 +634,7 @@ export function analyzeGPXData(xmlContent: string, settings: AnalysisSettings): 
     return {
       success: true,
       points,
+      rawPoints,
       stops,
       summary,
     };
@@ -494,6 +658,7 @@ function createEmptySummary(): AnalysisSummary {
     totalPoints: 0,
     filteredPointsCount: 0,
     totalDistanceMeters: 0,
+    totalElevationGainM: 0,
     stopCount: 0,
     stopRatioPercent: 0,
   };

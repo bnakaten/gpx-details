@@ -10,11 +10,13 @@ import { UploadForm } from './components/UploadForm';
 import { StatsDashboard } from './components/StatsDashboard';
 import { MapContainer } from './components/MapContainer';
 import { StopList } from './components/StopList';
+import { ElevationProfile } from './components/ElevationProfile';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { MapPin, Info, Sparkles, AlertCircle, FileSpreadsheet, Compass } from 'lucide-react';
 
 export default function App() {
   const [points, setPoints] = useState<GPXPoint[]>([]);
+  const [rawPoints, setRawPoints] = useState<GPXPoint[] | undefined>(undefined);
   const [stops, setStops] = useState<GPXStop[]>([]);
   const [selectedStop, setSelectedStop] = useState<GPXStop | null>(null);
   const [summary, setSummary] = useState<any>(null);
@@ -23,7 +25,11 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Trigger analysis by calling Express REST API back-end
+  const [elevationZoom, setElevationZoom] = useState<{ minDist: number; maxDist: number } | null>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
+  const [mapHoveredPoint, setMapHoveredPoint] = useState<GPXPoint | null>(null);
+  const [demoFile, setDemoFile] = useState<{ name: string; content: string } | null>(null);
+  const [analysisVersion, setAnalysisVersion] = useState(0);
   const handleAnalyze = async (content: string, name: string, settings: AnalysisSettings) => {
     setIsLoading(true);
     setError(null);
@@ -50,9 +56,11 @@ export default function App() {
 
       if (result.success) {
         setPoints(result.points);
+        setRawPoints(result.rawPoints);
         setStops(result.stops);
         setSummary(result.summary);
         setFilename(name);
+        setAnalysisVersion(v => v + 1);
       } else {
         throw new Error(result.error || 'Unbekannter Fehler bei der Analyse.');
       }
@@ -66,14 +74,7 @@ export default function App() {
 
   // Load the Munich tour demo directly
   const handleLoadDemo = () => {
-    const defaultSettings: AnalysisSettings = {
-      minDurationMinutes: 5,
-      maxRadiusMeters: 15,
-      detectionMethod: 'hybrid',
-      gpsFilterOutliers: true,
-      tolerateShortMovements: true,
-    };
-    handleAnalyze(DEMO_GPX_XML, 'muenchen_altstadt_tour.gpx', defaultSettings);
+    setDemoFile({ name: 'Tim-Tom.gpx', content: DEMO_GPX_XML });
   };
 
   return (
@@ -177,7 +178,9 @@ export default function App() {
             <UploadForm 
               onAnalyze={handleAnalyze} 
               isLoading={isLoading} 
-              error={error} 
+              error={error}
+              demoFile={demoFile}
+              expandOptions={analysisVersion}
             />
           </div>
 
@@ -207,14 +210,23 @@ export default function App() {
               <ErrorBoundary>
                 <MapContainer 
                   points={points} 
+                  rawPoints={rawPoints}
                   stops={stops} 
                   selectedStop={selectedStop} 
-                  onStopSelect={setSelectedStop} 
+                  onStopSelect={setSelectedStop}
+                  elevationZoomBounds={elevationZoom}
+                  hoveredPoint={hoveredPoint}
+                  onTrackHover={setMapHoveredPoint}
                 />
               </ErrorBoundary>
             </div>
 
-            {/* 2.3. Stop List result table (Only show when data loaded) */}
+            {/* 2.3. Elevation Profile */}
+            {points.length > 0 && (
+              <ElevationProfile points={points} totalDistanceMeters={summary?.totalDistanceMeters ?? 0} onZoomChange={setElevationZoom} onHoverChange={setHoveredPoint} highlightPoint={mapHoveredPoint} />
+            )}
+
+            {/* 2.4. Stop List result table (Only show when data loaded) */}
             {points.length > 0 && (
               <div className="grow">
                 <StopList 

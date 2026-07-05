@@ -49,6 +49,7 @@ export interface TrackSegment {
   stopData?: GPXStop;
   distanceMeters?: number;
   avgSpeedKmh?: number;
+  elevationGainM?: number;
 }
 
 export interface AnalysisSettings {
@@ -58,6 +59,9 @@ export interface AnalysisSettings {
   gpsFilterOutliers: boolean; // Flag to enable outlier filtering (e.g., speed > 150 km/h)
   tolerateShortMovements: boolean; // Flag to enable merging nearby stops with temporary short movements
   cutoffTimestampMs?: number; // Unix ms timestamp; points before (cutoffTimestampMs - 1 minute) are discarded
+  enableMapMatching?: boolean;
+  googleApiKey?: string;
+  densifyIntervalM?: number;
 }
 
 export interface AnalysisRequest {
@@ -73,6 +77,7 @@ export interface AnalysisSummary {
   totalPoints: number;
   filteredPointsCount: number;
   totalDistanceMeters: number;
+  totalElevationGainM: number;
   stopCount: number;
   stopRatioPercent: number; // Percentage of time spent stationary
 }
@@ -81,6 +86,7 @@ export interface AnalysisResponse {
   success: boolean;
   error?: string;
   points: GPXPoint[];
+  rawPoints?: GPXPoint[];
   stops: GPXStop[];
   summary: AnalysisSummary;
 }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AnalysisSettings, DetectionMethod } from '../types';
 import { Upload, FileCode, Sliders, ChevronDown, ChevronUp, AlertCircle, HelpCircle, Clock } from 'lucide-react';
 
@@ -11,27 +11,47 @@ interface UploadFormProps {
   onAnalyze: (content: string, filename: string, settings: AnalysisSettings) => void;
   isLoading: boolean;
   error: string | null;
+  demoFile?: { name: string; content: string } | null;
+  expandOptions?: boolean;
 }
 
-export function UploadForm({ onAnalyze, isLoading, error }: UploadFormProps) {
+export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOptions }: UploadFormProps) {
   // Settings State
   const [minDurationMinutes, setMinDurationMinutes] = useState<number>(5);
   const [maxRadiusMeters, setMaxRadiusMeters] = useState<number>(15);
   const [detectionMethod, setDetectionMethod] = useState<DetectionMethod>('hybrid');
   const [gpsFilterOutliers, setGpsFilterOutliers] = useState<boolean>(true);
   const [tolerateShortMovements, setTolerateShortMovements] = useState<boolean>(true);
+  const [enableMapMatching, setEnableMapMatching] = useState<boolean>(true);
+  const [densifyIntervalM, setDensifyIntervalM] = useState<number>(150);
+  const [googleApiKey, setGoogleApiKey] = useState<string>(() => {
+    try { return localStorage.getItem('gpx-google-api-key') || ''; } catch { return ''; }
+  });
 
   // Advanced section collapses
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   // Cutoff timestamp (fixed even when other params change)
-  const [cutoffTime, setCutoffTime] = useState<string>('');
-  const [savedCutoffMs, setSavedCutoffMs] = useState<number | null>(null);
+  const [cutoffTime, setCutoffTime] = useState<string>('2026-07-04T12:50');
+  const [savedCutoffMs, setSavedCutoffMs] = useState<number | null>(
+    new Date('2026-07-04T12:50').getTime()
+  );
 
   // File Upload States
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string; size: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (demoFile) {
+      const bytes = new Blob([demoFile.content]).size;
+      setUploadedFile({ name: demoFile.name, content: demoFile.content, size: formatBytes(bytes) });
+    }
+  }, [demoFile]);
+
+  useEffect(() => {
+    if (expandOptions) setShowAdvanced(true);
+  }, [expandOptions]);
 
   // Convert bytes for display
   const formatBytes = (bytes: number): string => {
@@ -106,6 +126,9 @@ export function UploadForm({ onAnalyze, isLoading, error }: UploadFormProps) {
       gpsFilterOutliers,
       tolerateShortMovements,
       cutoffTimestampMs: savedCutoffMs ?? undefined,
+      enableMapMatching,
+      googleApiKey: enableMapMatching ? googleApiKey : undefined,
+      densifyIntervalM: enableMapMatching ? densifyIntervalM : undefined,
     });
   };
 
@@ -324,6 +347,60 @@ export function UploadForm({ onAnalyze, isLoading, error }: UploadFormProps) {
                     </p>
                   </div>
                 </label>
+
+                {/* Map Matching */}
+                <label className="flex items-start gap-2 cursor-pointer text-xs group">
+                  <input
+                    type="checkbox"
+                    checked={enableMapMatching}
+                    onChange={(e) => setEnableMapMatching(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded-sm bg-[#F9FAFB] border-[#E5E7EB] text-[#2563EB] focus:ring-[#2563EB] mt-0.5"
+                  />
+                  <div className="min-w-0">
+                    <span className="font-semibold text-slate-700">
+                      Map Matching (Rennrad)
+                    </span>
+                    <p className="text-[10px] text-[#6B7280] leading-normal">
+                      Gleicht GPS-Punkte via Google Roads API an Straßen an.
+                    </p>
+                  </div>
+                </label>
+                {enableMapMatching && (
+                  <div className="ml-5.5">
+                    <input
+                      type="password"
+                      placeholder="Google Maps API Key"
+                      value={googleApiKey}
+                      onChange={(e) => {
+                        setGoogleApiKey(e.target.value);
+                        try { localStorage.setItem('gpx-google-api-key', e.target.value); } catch {}
+                      }}
+                      className="w-full px-2 py-1.5 text-xs bg-[#F9FAFB] border border-[#E5E7EB] rounded placeholder:text-[#9CA3AF] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                    />
+                    <label className="flex flex-col gap-1.5 text-xs mt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-700">
+                          Punktverdichtung
+                        </span>
+                        <span className="font-mono font-bold text-[#2563EB]">
+                          {densifyIntervalM === 0 ? 'Aus' : `${densifyIntervalM}m`}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="50"
+                        max="1000"
+                        step="50"
+                        value={densifyIntervalM}
+                        onChange={(e) => setDensifyIntervalM(Number(e.target.value))}
+                        className="w-full accent-[#2563EB] h-1.5"
+                      />
+                        <p className="text-[10px] text-[#6B7280] leading-normal">
+                          Stützpunktabstand vor Map Matching (50m–1km).
+                        </p>
+                    </label>
+                  </div>
+                )}
               </div>
             )}
           </div>

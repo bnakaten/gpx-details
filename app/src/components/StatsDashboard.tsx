@@ -117,6 +117,10 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
               <p className="text-[10px] text-[#6B7280]">Distanz:</p>
               <p className="font-bold text-slate-800 font-mono mt-0.5 text-sm">{distanceKm} km</p>
             </div>
+            <div>
+              <p className="text-[10px] text-[#6B7280]">Höhenm.:</p>
+              <p className="font-bold text-slate-800 font-mono mt-0.5 text-sm">{summary.totalElevationGainM} m</p>
+            </div>
             <div className="ml-auto text-right">
               <p className="text-[10px] text-[#6B7280]">Dauer:</p>
               <p className="font-semibold text-slate-800 font-mono mt-0.5" title={formatTrackDuration(summary.totalTrackDurationMs)}>

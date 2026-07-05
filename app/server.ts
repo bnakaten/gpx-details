@@ -18,7 +18,7 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
   // API Route: Analyze GPX text payload
-  app.post('/api/analyze', (req, res) => {
+  app.post('/api/analyze', async (req, res) => {
     try {
       const { content, settings } = req.body;
       
@@ -36,9 +36,12 @@ async function startServer() {
         gpsFilterOutliers: settings?.gpsFilterOutliers ?? true,
         tolerateShortMovements: settings?.tolerateShortMovements ?? true,
         cutoffTimestampMs: settings?.cutoffTimestampMs ?? undefined,
+        enableMapMatching: settings?.enableMapMatching ?? false,
+        googleApiKey: settings?.googleApiKey ?? undefined,
+        densifyIntervalM: Number(settings?.densifyIntervalM ?? 0),
       };
 
-      const result = analyzeGPXData(content, parsedSettings);
+      const result = await analyzeGPXData(content, parsedSettings);
       return res.json(result);
     } catch (error: any) {
       console.error('Analysis error in endpoint:', error);

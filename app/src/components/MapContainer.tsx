@@ -5,19 +5,29 @@ import { GPXPoint, GPXStop } from '../types';
 
 interface MapContainerProps {
   points: GPXPoint[];
+  rawPoints?: GPXPoint[];
   stops: GPXStop[];
   selectedStop: GPXStop | null;
   onStopSelect: (stop: GPXStop | null) => void;
+  elevationZoomBounds?: { minDist: number; maxDist: number } | null;
+  hoveredPoint?: GPXPoint | null;
+  onTrackHover?: (point: GPXPoint | null) => void;
 }
 
-export function MapContainer({ points, stops, selectedStop, onStopSelect }: MapContainerProps) {
+export function MapContainer({ points, rawPoints, stops, selectedStop, onStopSelect, elevationZoomBounds, hoveredPoint, onTrackHover }: MapContainerProps) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const gpxLayerRef = useRef<L.Polyline | null>(null);
+  const rawLayerRef = useRef<L.Polyline | null>(null);
   const startLayerRef = useRef<L.Marker | null>(null);
   const endLayerRef = useRef<L.Marker | null>(null);
   const stopLayersRef = useRef<{ circle: L.Circle | null; marker: L.Marker | null }[]>([]);
   const selectedStopLayersRef = useRef<{ ring: L.Circle | null; center: L.CircleMarker | null } | null>(null);
+  const hoverMarkerRef = useRef<L.CircleMarker | null>(null);
+  const pointsRef = useRef(points);
+  const onTrackHoverRef = useRef(onTrackHover);
+  useEffect(() => { pointsRef.current = points; });
+  useEffect(() => { onTrackHoverRef.current = onTrackHover; });
   const [isMapReady, setIsMapReady] = useState(false);
 
   useEffect(() => {
@@ -31,6 +41,47 @@ export function MapContainer({ points, stops, selectedStop, onStopSelect }: MapC
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         subdomains: ['a', 'b', 'c']
       }).addTo(mapRef.current);
+
+      L.control.scale({
+        metric: true,
+        imperial: false,
+        position: 'bottomright'
+      }).addTo(mapRef.current);
+
+      const LegendControl = L.Control.extend({
+        options: { position: 'bottomleft' },
+        onAdd() {
+          const div = L.DomUtil.create('div', 'leaflet-control');
+          div.style.cssText = 'background:white;padding:8px 10px;border-radius:6px;box-shadow:0 1px 5px rgba(0,0,0,0.15);font-size:12px;line-height:1.6;color:#374151;';
+          div.innerHTML = `
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+              <input type="checkbox" id="legend-google" checked style="accent-color:#2563eb;">
+              <span style="display:inline-block;width:24px;height:3px;background:#2563eb;border-radius:2px;opacity:0.9;flex-shrink:0;"></span>
+              <span>Google Roads</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer;user-select:none;">
+              <input type="checkbox" id="legend-raw" checked style="accent-color:#ef4444;">
+              <span style="display:inline-block;width:24px;height:3px;background:#ef4444;border-radius:2px;opacity:0.6;flex-shrink:0;"></span>
+              <span>Original-GPX</span>
+            </label>
+          `;
+          L.DomEvent.on(div.querySelector('#legend-google')!, 'change', (e: Event) => {
+            const cb = e.target as HTMLInputElement;
+            if (gpxLayerRef.current) {
+              cb.checked ? gpxLayerRef.current.addTo(mapRef.current!) : mapRef.current!.removeLayer(gpxLayerRef.current);
+            }
+          });
+          L.DomEvent.on(div.querySelector('#legend-raw')!, 'change', (e: Event) => {
+            const cb = e.target as HTMLInputElement;
+            if (rawLayerRef.current) {
+              cb.checked ? rawLayerRef.current.addTo(mapRef.current!) : mapRef.current!.removeLayer(rawLayerRef.current);
+            }
+          });
+          L.DomEvent.disableClickPropagation(div);
+          return div;
+        }
+      });
+      new LegendControl().addTo(mapRef.current);
       setIsMapReady(true);
     }
 
@@ -55,10 +106,49 @@ export function MapContainer({ points, stops, selectedStop, onStopSelect }: MapC
       mapRef.current.removeLayer(gpxLayerRef.current);
     }
     gpxLayerRef.current = L.polyline(points.map(pt => [pt.lat, pt.lon]), {
-      color: '#3b82f6',
+      color: '#2563eb',
       weight: 4,
-      opacity: 0.85
-    }).addTo(mapRef.current);
+      opacity: 0.9
+    });
+    gpxLayerRef.current.on('mousemove', (e: L.LeafletMouseEvent) => {
+      const mouseLat = e.latlng.lat;
+      const mouseLon = e.latlng.lng;
+      let best: GPXPoint | null = null;
+      let bestDist = Infinity;
+      for (const pt of pointsRef.current) {
+        const d = (pt.lat - mouseLat) ** 2 + (pt.lon - mouseLon) ** 2;
+        if (d < bestDist) { bestDist = d; best = pt; }
+      }
+      onTrackHoverRef.current?.(best);
+    });
+    gpxLayerRef.current.on('mouseout', () => {
+      onTrackHoverRef.current?.(null);
+    });
+    const googleCb = document.getElementById('legend-google') as HTMLInputElement | null;
+    if (!googleCb || googleCb.checked) {
+      gpxLayerRef.current.addTo(mapRef.current);
+    }
+
+    if (rawLayerRef.current) {
+      mapRef.current.removeLayer(rawLayerRef.current);
+    }
+    rawLayerRef.current = null;
+    const rawLegendRow = document.getElementById('legend-raw')?.parentElement;
+    if (rawLegendRow) {
+      rawLegendRow.style.display = (rawPoints && rawPoints.length > 0) ? 'flex' : 'none';
+    }
+    if (rawPoints && rawPoints.length > 0) {
+      rawLayerRef.current = L.polyline(rawPoints.map(pt => [pt.lat, pt.lon]), {
+        color: '#ef4444',
+        weight: 2,
+        opacity: 0.6,
+        dashArray: '8, 6'
+      });
+      const rawCb = document.getElementById('legend-raw') as HTMLInputElement | null;
+      if (!rawCb || rawCb.checked) {
+        rawLayerRef.current.addTo(mapRef.current);
+      }
+    }
 
     if (startLayerRef.current) {
       mapRef.current.removeLayer(startLayerRef.current);
@@ -141,7 +231,8 @@ export function MapContainer({ points, stops, selectedStop, onStopSelect }: MapC
       stopLayersRef.current[index] = { circle, marker };
     });
 
-    const bounds = L.latLngBounds(points.map(pt => [pt.lat, pt.lon]));
+    const allPts = rawPoints ? points.concat(rawPoints) : points;
+    const bounds = L.latLngBounds(allPts.map(pt => [pt.lat, pt.lon]));
     if (bounds.isValid()) {
       mapRef.current.fitBounds(bounds, { padding: [20, 20] });
     } else {
@@ -183,6 +274,47 @@ export function MapContainer({ points, stops, selectedStop, onStopSelect }: MapC
 
     selectedStopLayersRef.current = { ring, center };
   }, [selectedStop]);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady) return;
+
+    if (!elevationZoomBounds || points.length === 0) {
+      const allPts = rawPoints ? points.concat(rawPoints) : points;
+      if (allPts.length === 0) return;
+      const bounds = L.latLngBounds(allPts.map(pt => [pt.lat, pt.lon]));
+      if (bounds.isValid()) {
+        mapRef.current.fitBounds(bounds, { padding: [20, 20] });
+      }
+      return;
+    }
+
+    const zoomPts = points.filter(
+      p => p.cumulativeDistance !== undefined && p.cumulativeDistance >= elevationZoomBounds.minDist && p.cumulativeDistance <= elevationZoomBounds.maxDist
+    );
+    if (zoomPts.length < 2) return;
+
+    const bounds = L.latLngBounds(zoomPts.map(pt => [pt.lat, pt.lon]));
+    if (bounds.isValid()) {
+      mapRef.current.fitBounds(bounds, { padding: [30, 30] });
+    }
+  }, [elevationZoomBounds, isMapReady]);
+
+  useEffect(() => {
+    if (hoverMarkerRef.current) {
+      mapRef.current?.removeLayer(hoverMarkerRef.current);
+      hoverMarkerRef.current = null;
+    }
+
+    if (!mapRef.current || !hoveredPoint) return;
+
+    hoverMarkerRef.current = L.circleMarker([hoveredPoint.lat, hoveredPoint.lon], {
+      radius: 7,
+      color: '#2563eb',
+      fillColor: '#2563eb',
+      fillOpacity: 1,
+      weight: 0
+    }).addTo(mapRef.current);
+  }, [hoveredPoint]);
 
   return (
     <div className="relative w-full h-full rounded-lg overflow-hidden border border-[#E5E7EB] bg-slate-50">

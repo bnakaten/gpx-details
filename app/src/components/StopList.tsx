@@ -172,6 +172,12 @@ export function StopList({ points, stops, selectedStop, onStopSelect }: StopList
                 </div>
               </th>
 
+              <th className="py-3 px-4 text-[#6B7280]">
+                <div className="flex items-center gap-1">
+                  Höhenm.
+                </div>
+              </th>
+
               <th 
                 className="py-3 px-4 cursor-pointer hover:bg-slate-50 hover:text-slate-800 transition"
                 onClick={() => handleSort('pointCount')}
@@ -263,6 +269,16 @@ export function StopList({ points, stops, selectedStop, onStopSelect }: StopList
                   </td>
 
                   <td className="py-3.5 px-4 text-slate-500 font-mono">
+                    {isStop ? (
+                      <span className="text-slate-300">—</span>
+                    ) : seg.elevationGainM != null ? (
+                      <span className="text-amber-700">{seg.elevationGainM} m</span>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+
+                  <td className="py-3.5 px-4 text-slate-500 font-mono">
                     {seg.pointCount}
                   </td>
                 </tr>
@@ -299,9 +315,15 @@ function buildMovementSegment(
   if (durationMs <= 0) return null;
 
   let distanceMeters = 0;
+  let elevationGain = 0;
   for (let i = startIdx; i < endIdx; i++) {
     const d = points[i].distanceFromPrev ?? 0;
     if (i > startIdx) distanceMeters += d;
+    const pe = points[i].ele;
+    const ce = points[i + 1]?.ele;
+    if (pe !== undefined && ce !== undefined && ce > pe) {
+      elevationGain += ce - pe;
+    }
   }
   if (points[endIdx].distanceFromPrev && endIdx > startIdx) {
     distanceMeters += points[endIdx].distanceFromPrev;
@@ -321,5 +343,6 @@ function buildMovementSegment(
     endIndex: endIdx,
     distanceMeters: Math.round(distanceMeters),
     avgSpeedKmh: Math.round(avgSpeedKmh * 10) / 10,
+    elevationGainM: Math.round(elevationGain),
   };
 }
