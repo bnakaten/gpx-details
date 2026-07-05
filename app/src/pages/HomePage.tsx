@@ -89,7 +89,11 @@ export default function HomePage() {
               Analyze stop times from recorded GPX routes
             </h2>
             <p className="text-xs text-[#6B7280] leading-relaxed">
-              Upload a GPX track and detect every stop along the route. The algorithm filters out GPS jitter, removes signal outliers, and presents all rest phases in a clear table alongside an interactive map visualization.
+              This app can generate accurate routes along drivable roads from simple GPX files using Google Roads' "Snap to Roads" service. In addition, it analyzes key metrics such as distance, elevation gain, speed, and pause times.
+
+              Thanks to its integration with Strava, stop times and interruptions can be examined in even greater detail.
+
+              The app originally started as a side project to better understand and analyze the movement patterns and riding behavior of Three Peaks riders.
             </p>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
               <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">

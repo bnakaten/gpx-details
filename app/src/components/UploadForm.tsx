@@ -256,7 +256,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
         <div>
           <h2 className="text-xs font-bold text-[#111827] uppercase tracking-wider flex items-center gap-2">
             <Sliders size={14} className="text-[#2563EB]" />
-            Parameters & Datei
+            Parameters &amp; File
           </h2>
           <p className="text-[11px] text-[#6B7280] mt-1.5 leading-relaxed">
             Configure thresholds and upload your GPX log for stop detection.
@@ -413,7 +413,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
             Only data after this point in time minus 1 minute will be analyzed.
             {savedCutoffMs && (
               <span className="block mt-0.5 text-[#2563EB] font-semibold">
-                Gespeichert: {new Date(savedCutoffMs).toLocaleString('de-DE')}
+                Saved: {new Date(savedCutoffMs).toLocaleString('en-US')}
               </span>
             )}
           </p>
