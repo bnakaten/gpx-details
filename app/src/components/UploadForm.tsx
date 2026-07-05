@@ -6,6 +6,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnalysisSettings, DetectionMethod } from '../types';
 import { Upload, FileCode, Sliders, ChevronDown, ChevronUp, AlertCircle, HelpCircle, Clock, ExternalLink, X } from 'lucide-react';
+import { ProgressBar } from './ProgressBar';
+import { useAuth } from './AuthContext';
 
 interface UploadFormProps {
   onAnalyze: (content: string, filename: string, settings: AnalysisSettings) => void;
@@ -16,6 +18,8 @@ interface UploadFormProps {
 }
 
 export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOptions }: UploadFormProps) {
+  const { user } = useAuth();
+
   // Settings State
   const [minDurationMinutes, setMinDurationMinutes] = useState<number>(5);
   const [maxRadiusMeters, setMaxRadiusMeters] = useState<number>(15);
@@ -33,6 +37,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
   const [showGoogleApiHelp, setShowGoogleApiHelp] = useState<boolean>(false);
 
   // Cutoff timestamp (fixed even when other params change)
+  const [cutoffEnabled, setCutoffEnabled] = useState<boolean>(true);
   const [cutoffTime, setCutoffTime] = useState<string>('2026-07-04T12:50');
   const [savedCutoffMs, setSavedCutoffMs] = useState<number | null>(
     new Date('2026-07-04T12:50').getTime()
@@ -42,6 +47,105 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string; size: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Strava activity selector states
+  const [stravaActivities, setStravaActivities] = useState<StravaActivity[]>([]);
+  const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
+  const [stravaLoading, setStravaLoading] = useState<boolean>(false);
+  const [stravaError, setStravaError] = useState<string | null>(null);
+  const [stravaDownloadProgress, setStravaDownloadProgress] = useState<number | null>(null);
+  const [stravaDateFrom, setStravaDateFrom] = useState<string>(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [stravaDateTo, setStravaDateTo] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+
+  interface StravaActivity {
+    id: number;
+    name: string;
+    distance: number;
+    start_date: string;
+    type: string;
+  }
+
+  const fetchStravaActivities = (from?: string, to?: string) => {
+    if (!user) return;
+    setStravaLoading(true);
+    setStravaError(null);
+    const params = new URLSearchParams();
+    if (from) params.set('after', String(Math.floor(new Date(from).getTime() / 1000)));
+    if (to) params.set('before', String(Math.floor(new Date(to + 'T23:59:59').getTime() / 1000)));
+    fetch(`/api/strava/activities?${params.toString()}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Error loading.');
+        return res.json();
+      })
+      .then((data) => setStravaActivities(data.activities || []))
+      .catch((err) => setStravaError(err.message))
+      .finally(() => setStravaLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStravaActivities(stravaDateFrom, stravaDateTo);
+  }, [user]);
+
+  const handleStravaActivityChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value ? parseInt(e.target.value) : null;
+    setSelectedActivityId(id);
+    if (!id) {
+      setUploadedFile(null);
+      return;
+    }
+    const activity = stravaActivities.find((a) => a.id === id);
+    const startDate = activity?.start_date || '';
+    setStravaLoading(true);
+    setStravaError(null);
+    setStravaDownloadProgress(0);
+    try {
+      const url = `/api/strava/activity/${id}/gpx?startDate=${encodeURIComponent(startDate)}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Error fetching GPX data.');
+      }
+
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      const reader = response.body!.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total > 0) {
+          setStravaDownloadProgress(Math.round((received / total) * 100));
+        }
+      }
+
+      const merged = new Uint8Array(received);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+      const body = new TextDecoder().decode(merged);
+      const data = JSON.parse(body);
+
+      const name = activity ? `${activity.name}.gpx` : `strava_${id}.gpx`;
+      setUploadedFile({ name, content: data.gpx, size: '' });
+    } catch (err: any) {
+      setStravaError(err.message);
+    } finally {
+      setStravaLoading(false);
+      setStravaDownloadProgress(null);
+    }
+  };
 
   useEffect(() => {
     if (demoFile) {
@@ -61,6 +165,11 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatDistance = (meters: number): string => {
+    if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
+    return `${meters.toFixed(0)} m`;
   };
 
   // Process file contents
@@ -126,7 +235,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
       detectionMethod,
       gpsFilterOutliers,
       tolerateShortMovements,
-      cutoffTimestampMs: savedCutoffMs ?? undefined,
+      cutoffTimestampMs: cutoffEnabled ? (savedCutoffMs ?? undefined) : undefined,
       enableMapMatching,
       googleApiKey: enableMapMatching ? googleApiKey : undefined,
       densifyIntervalM: enableMapMatching ? densifyIntervalM : undefined,
@@ -172,6 +281,72 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
             )}
           </button>
         </div>
+
+        {/* Strava Activity Selector */}
+        {user && (
+          <div className="border border-[#FC4C02]/30 bg-orange-50/50 rounded-md p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#FC4C02">
+                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.01 13.828h4.172" />
+              </svg>
+              <span className="text-xs font-semibold text-[#FC4C02] uppercase tracking-wider">
+                Strava Activity
+              </span>
+            </div>
+            <div className="flex gap-1.5 items-center">
+              <input
+                type="date"
+                value={stravaDateFrom}
+                onChange={(e) => setStravaDateFrom(e.target.value)}
+                className="flex-1 text-[10px] border border-[#E5E7EB] bg-white rounded px-1.5 py-1 text-[#111827] focus:outline-none focus:border-[#FC4C02]"
+              />
+              <span className="text-[10px] text-[#6B7280]">-</span>
+              <input
+                type="date"
+                value={stravaDateTo}
+                onChange={(e) => setStravaDateTo(e.target.value)}
+                className="flex-1 text-[10px] border border-[#E5E7EB] bg-white rounded px-1.5 py-1 text-[#111827] focus:outline-none focus:border-[#FC4C02]"
+              />
+              <button
+                type="button"
+                onClick={() => fetchStravaActivities(stravaDateFrom, stravaDateTo)}
+                disabled={stravaLoading}
+                className="px-2 py-1 bg-[#E5E7EB] hover:bg-[#D1D5DB] text-[#374151] text-[10px] rounded font-semibold uppercase tracking-wider disabled:opacity-50 transition cursor-pointer"
+              >
+                Load
+              </button>
+            </div>
+            {stravaLoading && stravaActivities.length === 0 ? (
+              <p className="text-[10px] text-[#6B7280]">Loading activities...</p>
+            ) : stravaError && stravaActivities.length === 0 ? (
+              <p className="text-[10px] text-rose-600">{stravaError}</p>
+            ) : stravaActivities.length === 0 ? (
+              <p className="text-[10px] text-[#6B7280]">No activities in this time range.</p>
+            ) : (
+              <div>
+                <select
+                  value={selectedActivityId ?? ''}
+                  onChange={handleStravaActivityChange}
+                  disabled={stravaLoading || isLoading}
+                  className="w-full text-[10px] border border-[#E5E7EB] bg-white rounded px-2 py-1.5 text-[#111827] focus:outline-none focus:border-[#FC4C02] disabled:opacity-50"
+                >
+                  <option value="">Select activity...</option>
+                  {stravaActivities.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {formatDistance(a.distance)} -- {a.name} ({new Date(a.start_date).toLocaleDateString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {stravaError && stravaActivities.length > 0 && (
+              <p className="text-[10px] text-rose-600">{stravaError}</p>
+            )}
+            {stravaDownloadProgress !== null && (
+              <ProgressBar value={stravaDownloadProgress} phase="loading" />
+            )}
+          </div>
+        )}
 
         {/* Drag and Drop Zone */}
         <div 
@@ -224,6 +399,15 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
           <div className="flex items-center gap-2 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">
             <Clock size={12} />
             Start Timestamp
+            <label className="ml-auto flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={cutoffEnabled}
+                onChange={(e) => setCutoffEnabled(e.target.checked)}
+                className="w-3 h-3 accent-[#2563EB] cursor-pointer"
+              />
+              <span className="text-[9px] font-normal normal-case tracking-normal">active</span>
+            </label>
           </div>
           <p className="text-[10px] text-[#6B7280] leading-relaxed">
             Only data after this point in time minus 1 minute will be analyzed.
@@ -234,16 +418,18 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
             )}
           </p>
           <div className="flex gap-2">
-            <input
-              type="datetime-local"
-              value={cutoffTime}
-              onChange={(e) => setCutoffTime(e.target.value)}
-              className="grow text-[11px] border border-[#E5E7EB] rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
-            />
-            <button
-              type="button"
-              onClick={handleSaveCutoff}
-              className="shrink-0 px-3 py-1.5 bg-[#2563EB] text-white rounded text-[10px] font-semibold uppercase tracking-wider hover:bg-blue-700 transition cursor-pointer"
+              <input
+                type="datetime-local"
+                value={cutoffTime}
+                onChange={(e) => setCutoffTime(e.target.value)}
+                disabled={!cutoffEnabled}
+                className="grow text-[11px] border border-[#E5E7EB] rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-[#2563EB] disabled:opacity-40 disabled:cursor-not-allowed"
+              />
+              <button
+                type="button"
+                onClick={handleSaveCutoff}
+                disabled={!cutoffEnabled}
+                className="shrink-0 px-3 py-1.5 bg-[#2563EB] text-white rounded text-[10px] font-semibold uppercase tracking-wider hover:bg-blue-700 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
                             Save
             </button>
