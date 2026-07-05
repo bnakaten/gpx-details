@@ -1,6 +1,0 @@
-{
-  "name": "GPX Standzeit-Analyse",
-  "description": "Analyse von GPX-Dateien zur Erkennung, Auflistung und Visualisierung von Standzeiten auf einer interaktiven Karte.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
