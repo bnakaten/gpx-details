@@ -19,6 +19,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.set('trust proxy', true);
+
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ extended: true, limit: '100mb' }));
   app.use(cookieParser());
