@@ -610,6 +610,9 @@ export async function analyzeGPXData(xmlContent: string, settings: AnalysisSetti
     const totalTrackDurationMs = lastPt.timestampMs - firstPt.timestampMs;
     const totalDistance = lastPt.cumulativeDistance || 0;
 
+    // Smooth elevation outliers
+    smoothElevationOutliers(points);
+
     let totalElevationGain = 0;
     for (let i = 1; i < points.length; i++) {
       const prevEle = points[i - 1].ele;
@@ -647,6 +650,70 @@ export async function analyzeGPXData(xmlContent: string, settings: AnalysisSetti
       stops: [],
       summary: createEmptySummary(),
     };
+  }
+}
+
+function smoothElevationOutliers(points: GPXPoint[]): void {
+  const WINDOW_M = 2000;
+  const MAX_GAIN_M = 1000;
+
+  const outlierFlags: boolean[] = new Array(points.length).fill(false);
+
+  for (let i = 0; i < points.length; i++) {
+    const startDist = points[i].cumulativeDistance ?? 0;
+    let maxGain = 0;
+    let maxGainPeakIdx = i;
+    let prevEle = points[i].ele;
+    let prevDist = startDist;
+
+    for (let j = i + 1; j < points.length; j++) {
+      const currDist = points[j].cumulativeDistance ?? 0;
+      if (currDist - startDist > WINDOW_M) break;
+
+      const currEle = points[j].ele;
+      if (currEle !== undefined && prevEle !== undefined) {
+        const gain = currEle - prevEle;
+        if (gain > 0) {
+          const localGain = maxGain + gain;
+          if (localGain > maxGain) {
+            maxGain = localGain;
+            maxGainPeakIdx = j;
+          }
+          prevEle = currEle;
+        }
+      }
+      prevDist = currDist;
+    }
+
+    if (maxGain > MAX_GAIN_M) {
+      for (let k = i + 1; k <= maxGainPeakIdx; k++) {
+        outlierFlags[k] = true;
+      }
+    }
+  }
+
+  for (let i = 0; i < points.length; i++) {
+    if (!outlierFlags[i] || points[i].ele === undefined) continue;
+
+    let prevIdx = i - 1;
+    while (prevIdx >= 0 && outlierFlags[prevIdx]) prevIdx--;
+    let nextIdx = i + 1;
+    while (nextIdx < points.length && outlierFlags[nextIdx]) nextIdx++;
+
+    const prevEle = prevIdx >= 0 ? points[prevIdx].ele : undefined;
+    const nextEle = nextIdx < points.length ? points[nextIdx].ele : undefined;
+    const prevDist = prevIdx >= 0 ? (points[prevIdx].cumulativeDistance ?? 0) : undefined;
+    const nextDist = nextIdx < points.length ? (points[nextIdx].cumulativeDistance ?? 0) : undefined;
+    const currDist = points[i].cumulativeDistance ?? 0;
+
+    if (prevEle !== undefined && nextEle !== undefined && prevDist !== undefined && nextDist !== undefined && nextDist > prevDist) {
+      const frac = (currDist - prevDist) / (nextDist - prevDist);
+      points[i].ele = prevEle + frac * (nextEle - prevEle);
+    } else if (prevEle !== undefined) {
+      points[i].ele = prevEle;
+    } else if (nextEle !== undefined) {
+      points[i].ele = nextEle;
+    }
   }
 }
 
