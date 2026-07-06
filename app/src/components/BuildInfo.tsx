@@ -1,6 +1,6 @@
 /**
  * @license
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 
 import React from 'react';
@@ -66,7 +66,7 @@ export function BuildInfo() {
           className="inline-flex items-center gap-1 hover:text-[#6B7280] transition"
         >
           <Scale size={12} />
-          Apache-2.0
+           GPL-3.0
         </a>
         </div>
       </div>

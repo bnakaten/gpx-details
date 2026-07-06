@@ -1,6 +1,6 @@
 /**
  * @license
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 
 import { Router, Request, Response } from 'express';
@@ -68,13 +68,24 @@ export function createAuthRouter(): Router {
   });
 
   router.get('/strava/callback', async (req: Request, res: Response) => {
-    const { code, state, sk } = req.query;
+    const { code, state } = req.query;
 
     if (!code || typeof code !== 'string') {
       return res.status(400).send('Missing OAuth code.');
     }
 
-    if (!state || typeof state !== 'string' || !sk || typeof sk !== 'string' || !verifyState(sk, state)) {
+    if (!state || typeof state !== 'string') {
+      return res.status(403).send('Missing state parameter.');
+    }
+
+    const sep = state.indexOf(':');
+    if (sep <= 0 || sep >= state.length - 1) {
+      return res.status(403).send('Invalid state parameter.');
+    }
+    const sk = state.substring(0, sep);
+    const actualState = state.substring(sep + 1);
+
+    if (!verifyState(sk, actualState)) {
       return res.status(403).send('Invalid state parameter.');
     }
 

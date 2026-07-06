@@ -1,6 +1,6 @@
 /**
  * @license
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 
 import { XMLParser } from 'fast-xml-parser';
@@ -599,21 +599,27 @@ export async function analyzeGPXData(xmlContent: string, settings: AnalysisSetti
       }
     }
 
+    // 3.5 Fix extreme elevation outliers (unrealistic gain per distance window)
+    fixElevationOutliers(points, 10000, 2000); // 10km window, 2000m max gain
+
+    // 3.6 Apply elevation smoothing (mimics barometric altimeter behavior)
+    const smoothedPoints = smoothElevationGaussian(points, settings.elevationSmoothingRadius ?? 200);
+
     // 4. Compile statistics
     let totalStopMs = 0;
     for (const stop of stops) {
       totalStopMs += stop.durationMs;
     }
 
-    const firstPt = points[0];
-    const lastPt = points[points.length - 1];
+    const firstPt = smoothedPoints[0];
+    const lastPt = smoothedPoints[smoothedPoints.length - 1];
     const totalTrackDurationMs = lastPt.timestampMs - firstPt.timestampMs;
     const totalDistance = lastPt.cumulativeDistance || 0;
 
     let totalElevationGain = 0;
-    for (let i = 1; i < points.length; i++) {
-      const prevEle = points[i - 1].ele;
-      const currEle = points[i].ele;
+    for (let i = 1; i < smoothedPoints.length; i++) {
+      const prevEle = smoothedPoints[i - 1].ele;
+      const currEle = smoothedPoints[i].ele;
       if (prevEle !== undefined && currEle !== undefined && currEle > prevEle) {
         totalElevationGain += currEle - prevEle;
       }
@@ -633,7 +639,7 @@ export async function analyzeGPXData(xmlContent: string, settings: AnalysisSetti
 
     return {
       success: true,
-      points,
+      points: smoothedPoints,
       rawPoints,
       stops,
       summary,
@@ -648,6 +654,143 @@ export async function analyzeGPXData(xmlContent: string, settings: AnalysisSetti
       summary: createEmptySummary(),
     };
   }
+}
+
+/**
+ * Detects 10 km windows where total positive elevation gain exceeds 2000 m
+ * (20% grade — physically impossible for cycling). Marks the entire window
+ * as anomalous so the mountain is flattened via interpolation, not just the climb.
+ */
+function fixElevationOutliers(
+  points: GPXPoint[],
+  windowM: number,
+  maxGainM: number,
+): void {
+  if (points.length < 2) return;
+
+  const anomaly: boolean[] = new Array(points.length).fill(false);
+
+  for (let i = 0; i < points.length; i++) {
+    const startDist = points[i].cumulativeDistance || 0;
+    let gain = 0;
+    let prevEle: number | undefined = points[i].ele;
+    let jEnd = i;
+
+    for (let j = i + 1; j < points.length; j++) {
+      const distEnd = points[j].cumulativeDistance || 0;
+      if (distEnd - startDist > windowM) break;
+
+      jEnd = j;
+      const currEle = points[j].ele;
+      if (prevEle !== undefined && currEle !== undefined && currEle > prevEle) {
+        gain += currEle - prevEle;
+      }
+      prevEle = currEle;
+    }
+
+    // If the entire 10km window has excessive gain, flatten it all
+    if (jEnd > i && gain > maxGainM) {
+      for (let k = i; k <= jEnd; k++) {
+        anomaly[k] = true;
+      }
+    }
+  }
+
+  // Fix anomalous sections by linear interpolation from clean neighbors
+  let sectionStart = -1;
+  for (let i = 0; i <= points.length; i++) {
+    if (i < points.length && anomaly[i]) {
+      if (sectionStart === -1) sectionStart = i;
+    } else {
+      if (sectionStart !== -1) {
+        const sectionEnd = i - 1;
+        // Find clean elevation before and after the section
+        let eleBefore: number | undefined;
+        let distBefore: number | undefined;
+        for (let k = sectionStart - 1; k >= 0; k--) {
+          if (!anomaly[k] && points[k].ele !== undefined) {
+            eleBefore = points[k].ele;
+            distBefore = points[k].cumulativeDistance || 0;
+            break;
+          }
+        }
+
+        let eleAfter: number | undefined;
+        let distAfter: number | undefined;
+        for (let k = sectionEnd + 1; k < points.length; k++) {
+          if (!anomaly[k] && points[k].ele !== undefined) {
+            eleAfter = points[k].ele;
+            distAfter = points[k].cumulativeDistance || 0;
+            break;
+          }
+        }
+
+        // Interpolate
+        for (let k = sectionStart; k <= sectionEnd; k++) {
+          const kDist = points[k].cumulativeDistance || 0;
+
+          if (eleBefore !== undefined && eleAfter !== undefined && distAfter !== distBefore) {
+            const t = (kDist - distBefore!) / (distAfter! - distBefore!);
+            points[k].ele = eleBefore + (eleAfter - eleBefore) * t;
+          } else if (eleBefore !== undefined) {
+            points[k].ele = eleBefore;
+          } else if (eleAfter !== undefined) {
+            points[k].ele = eleAfter;
+          }
+          // If neither before nor after clean elevation exists, leave as-is
+        }
+
+        sectionStart = -1;
+      }
+    }
+  }
+}
+
+/**
+ * Applies a distance-weighted Gaussian smoothing to the elevation values.
+ * This mimics the natural smoothing of a barometric altimeter,
+ * reducing GPS noise (±5-15m random spikes) and thereby reducing
+ * artificial elevation gain from noise.
+ * Uses a sliding window for O(n) performance.
+ */
+function smoothElevationGaussian(points: GPXPoint[], radiusM: number): GPXPoint[] {
+  if (points.length < 2 || radiusM <= 0) return points;
+
+  const sigma = radiusM;
+  const sigmaSq2 = 2 * sigma * sigma;
+  const windowRadius = 3 * sigma; // 99.7% of weight within 3σ
+
+  for (let i = 0; i < points.length; i++) {
+    const distI = points[i].cumulativeDistance || 0;
+    let weightSum = 0;
+    let elevSum = 0;
+
+    // Only consider points within the window
+    for (let j = i; j >= 0; j--) {
+      const distJ = points[j].cumulativeDistance || 0;
+      if (distI - distJ > windowRadius) break;
+      if (points[j].ele === undefined) continue;
+      const d = distI - distJ;
+      const w = Math.exp(-(d * d) / sigmaSq2);
+      weightSum += w;
+      elevSum += w * points[j].ele!;
+    }
+    for (let j = i + 1; j < points.length; j++) {
+      const distJ = points[j].cumulativeDistance || 0;
+      if (distJ - distI > windowRadius) break;
+      if (points[j].ele === undefined) continue;
+      const d = distJ - distI;
+      const w = Math.exp(-(d * d) / sigmaSq2);
+      weightSum += w;
+      elevSum += w * points[j].ele!;
+    }
+
+    if (weightSum > 0) {
+      points[i].ele = elevSum / weightSum;
+    }
+  }
+
+  return points;
 }
 
 function createEmptySummary(): AnalysisSummary {

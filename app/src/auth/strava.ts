@@ -1,6 +1,6 @@
 /**
  * @license
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 
 let stravaClientId = process.env.STRAVA_CLIENT_ID || '';
@@ -8,14 +8,14 @@ let stravaClientSecret = process.env.STRAVA_CLIENT_SECRET || '';
 let stravaRedirectUri = process.env.STRAVA_REDIRECT_URI || '';
 
 export function getStravaAuthUrl(state: string, storeKey: string, redirectUri: string): string {
-  const redirect = `${redirectUri}?sk=${encodeURIComponent(storeKey)}`;
+  const combinedState = `${storeKey}:${state}`;
   const params = new URLSearchParams({
     client_id: stravaClientId,
-    redirect_uri: redirect,
+    redirect_uri: redirectUri,
     response_type: 'code',
     approval_prompt: 'auto',
     scope: 'read,activity:read',
-    state,
+    state: combinedState,
   });
   return `https://www.strava.com/oauth/authorize?${params.toString()}`;
 }
