@@ -655,38 +655,29 @@ export async function analyzeGPXData(xmlContent: string, settings: AnalysisSetti
 
 function smoothElevationOutliers(points: GPXPoint[]): void {
   const WINDOW_M = 4000;
-  const MAX_GAIN_M = 1000;
+  const MAX_GAIN_M = 2000;
 
   const outlierFlags: boolean[] = new Array(points.length).fill(false);
 
   for (let i = 0; i < points.length; i++) {
+    if (points[i].ele === undefined) continue;
     const startDist = points[i].cumulativeDistance ?? 0;
-    let maxGain = 0;
-    let maxGainPeakIdx = i;
-    let prevEle = points[i].ele;
-    let prevDist = startDist;
+    let maxEle = points[i].ele!;
+    let minEle = points[i].ele!;
+    let maxJ = i;
 
     for (let j = i + 1; j < points.length; j++) {
       const currDist = points[j].cumulativeDistance ?? 0;
       if (currDist - startDist > WINDOW_M) break;
-
-      const currEle = points[j].ele;
-      if (currEle !== undefined && prevEle !== undefined) {
-        const gain = currEle - prevEle;
-        if (gain > 0) {
-          const localGain = maxGain + gain;
-          if (localGain > maxGain) {
-            maxGain = localGain;
-            maxGainPeakIdx = j;
-          }
-          prevEle = currEle;
-        }
+      if (points[j].ele !== undefined) {
+        if (points[j].ele! > maxEle) maxEle = points[j].ele!;
+        if (points[j].ele! < minEle) minEle = points[j].ele!;
       }
-      prevDist = currDist;
+      maxJ = j;
     }
 
-    if (maxGain > MAX_GAIN_M) {
-      for (let k = i + 1; k <= maxGainPeakIdx; k++) {
+    if (maxEle - minEle > MAX_GAIN_M && maxJ > i) {
+      for (let k = i + 1; k < maxJ; k++) {
         outlierFlags[k] = true;
       }
     }
