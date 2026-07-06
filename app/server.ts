@@ -68,10 +68,10 @@ async function startServer() {
     try {
       const { files } = req.body;
 
-      if (!Array.isArray(files) || files.length < 2 || files.length > 5) {
+      if (!Array.isArray(files) || files.length < 2) {
         return res.status(400).json({
           success: false,
-          error: 'Provide 2–5 files for comparison.',
+          error: 'Provide at least 2 files for comparison.',
         });
       }
 
