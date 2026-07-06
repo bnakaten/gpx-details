@@ -62,6 +62,7 @@ export interface AnalysisSettings {
   enableMapMatching?: boolean;
   googleApiKey?: string;
   densifyIntervalM?: number;
+  elevationSmoothingRadius?: number; // Gaussian smoothing radius in meters (default 200). 0 = off.
 }
 
 export interface AnalysisRequest {
@@ -89,6 +90,21 @@ export interface AnalysisResponse {
   rawPoints?: GPXPoint[];
   stops: GPXStop[];
   summary: AnalysisSummary;
+}
+
+export interface CompareRequest {
+  files: {
+    filename: string;
+    content: string;
+    settings: AnalysisSettings;
+  }[];
+}
+
+export interface CompareResponse {
+  results: {
+    filename: string;
+    summary: AnalysisSummary;
+  }[];
 }
 
 export interface AuthUser {

@@ -44,7 +44,7 @@ export function Layout() {
             <div>
               <h1 className="text-sm font-bold tracking-tight text-[#111827]">GPX Analyzer</h1>
               <p className="text-[10px] text-[#6B7280] font-semibold uppercase tracking-wider">
-                Stop-time Analysis &amp; Waypoint Filter
+                Track Analysis · Elevation · Stop Detection
               </p>
             </div>
           </Link>

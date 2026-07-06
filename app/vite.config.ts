@@ -32,7 +32,7 @@ export default defineConfig(() => {
     define: {
       __GIT_BRANCH__: JSON.stringify(gitInfo.branch),
       __GIT_COMMIT__: JSON.stringify(gitInfo.commit),
-      __REPO_URL__: JSON.stringify('https://github.com/your-org/gpx-details'),
+      __REPO_URL__: JSON.stringify('https://github.com/bnakaten/gpx-details'),
       __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
     },
     server: {

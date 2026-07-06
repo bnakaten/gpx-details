@@ -13,9 +13,13 @@ import { MapContainer } from '../components/MapContainer';
 import { StopList } from '../components/StopList';
 import { ElevationProfile } from '../components/ElevationProfile';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { Sparkles, FileSpreadsheet } from 'lucide-react';
+import { ComparePage } from '../components/ComparePage';
+import { Sparkles, FileSpreadsheet, FileText, Columns } from 'lucide-react';
+
+type Mode = 'analyze' | 'compare';
 
 export default function HomePage() {
+  const [mode, setMode] = useState<Mode>('analyze');
   const [points, setPoints] = useState<GPXPoint[]>([]);
   const [rawPoints, setRawPoints] = useState<GPXPoint[] | undefined>(undefined);
   const [stops, setStops] = useState<GPXStop[]>([]);
@@ -80,6 +84,35 @@ export default function HomePage() {
 
   return (
     <>
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setMode('analyze')}
+          className={`px-4 py-1.5 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer ${
+            mode === 'analyze'
+              ? 'bg-[#2563EB] text-white'
+              : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
+          }`}
+        >
+          <FileText size={14} />
+          Analyze
+        </button>
+        <button
+          onClick={() => setMode('compare')}
+          className={`px-4 py-1.5 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer ${
+            mode === 'compare'
+              ? 'bg-[#2563EB] text-white'
+              : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
+          }`}
+        >
+          <Columns size={14} />
+          Compare
+        </button>
+      </div>
+
+      {mode === 'compare' ? (
+        <ComparePage />
+      ) : (
+        <>
       {points.length === 0 && (
         <div className="col-span-full bg-white border border-[#E5E7EB] rounded-lg p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl text-center md:text-left">
@@ -90,11 +123,16 @@ export default function HomePage() {
               Analyze stop times from recorded GPX routes
             </h2>
             <p className="text-xs text-[#6B7280] leading-relaxed">
-              This app can generate accurate routes along drivable roads from simple GPX files using Google Roads' "Snap to Roads" service. In addition, it analyzes key metrics such as distance, elevation gain, speed, and pause times.
-
-              Thanks to its integration with Strava, stop times and interruptions can be examined in even greater detail.
-
-              The app originally started as a side project to better understand and analyze the movement patterns and riding behavior of Three Peaks riders.
+              This app analyzes GPX track files to extract key cycling metrics. Upload any ride and get instant insights into distance, elevation gain, speed, and pause times. The analysis pipeline processes your data in several stages:
+            </p>
+            <ul className="text-[11px] text-[#6B7280] leading-relaxed space-y-1 ml-5 list-disc">
+              <li><strong>Map Matching:</strong> Optionally snaps GPS points to drivable roads via Google Roads API, with configurable point densification.</li>
+              <li><strong>Outlier Filtering:</strong> Removes unrealistic speed spikes and GPS jumps (points exceeding 180 km/h with sudden coordinate shifts).</li>
+              <li><strong>Elevation Smoothing:</strong> Applies a Gaussian distance-weighted filter to GPS elevation data, mimicking the natural smoothing of a barometric altimeter and reducing artificial elevation gain from GPS noise (±5–15m).</li>
+              <li><strong>Stop Detection:</strong> Identifies rest breaks using hybrid distance/speed detection with configurable minimum duration, maximum radius, and short-movement tolerance.</li>
+            </ul>
+            <p className="text-xs text-[#6B7280] leading-relaxed pt-1">
+              Thanks to its integration with Strava, stop times and ride patterns can be examined in even greater detail. The app originally started as a side project to better understand the movement patterns and riding behavior of Three Peaks riders.
             </p>
             <div className="pt-1">
               <a
@@ -109,16 +147,22 @@ export default function HomePage() {
             </div>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
               <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">
-                Adjustable minimum duration
+                Elevation smoothing
               </span>
               <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">
-                Selectable maximum radius
+                Google Maps Road Snap
               </span>
               <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">
-                Interactive map sections
+                Hybrid stop detection
               </span>
               <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">
-                Hybrid calculation
+                GPS outlier filter
+              </span>
+              <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">
+                Interactive elevation chart
+              </span>
+              <span className="text-[10px] bg-slate-50 text-[#6B7280] px-2 py-0.5 rounded border border-[#E5E7EB]">
+                Barometric simulation
               </span>
             </div>
           </div>
@@ -199,6 +243,8 @@ export default function HomePage() {
           )}
         </div>
       </div>
+        </>
+      )}
     </>
   );
 }

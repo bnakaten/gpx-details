@@ -50,6 +50,7 @@ async function startServer() {
         enableMapMatching: settings?.enableMapMatching ?? false,
         googleApiKey: settings?.googleApiKey ?? undefined,
         densifyIntervalM: Number(settings?.densifyIntervalM ?? 0),
+        elevationSmoothingRadius: Number(settings?.elevationSmoothingRadius ?? 200),
       };
 
       const result = await analyzeGPXData(content, parsedSettings);
@@ -59,6 +60,62 @@ async function startServer() {
       return res.status(500).json({
         success: false,
         error: `Server calculation error: ${error.message || error}`,
+      });
+    }
+  });
+
+  app.post('/api/history/compare', optionalAuth, async (req, res) => {
+    try {
+      const { files } = req.body;
+
+      if (!Array.isArray(files) || files.length < 2 || files.length > 5) {
+        return res.status(400).json({
+          success: false,
+          error: 'Provide 2–5 files for comparison.',
+        });
+      }
+
+      const results = [];
+      for (const file of files) {
+        if (!file.content || typeof file.content !== 'string') {
+          return res.status(400).json({
+            success: false,
+            error: `Invalid content for file "${file.filename}".`,
+          });
+        }
+
+        const parsedSettings: AnalysisSettings = {
+          minDurationMinutes: Number(file.settings?.minDurationMinutes ?? 5),
+          maxRadiusMeters: Number(file.settings?.maxRadiusMeters ?? 15),
+          detectionMethod: file.settings?.detectionMethod ?? 'hybrid',
+          gpsFilterOutliers: file.settings?.gpsFilterOutliers ?? true,
+          tolerateShortMovements: file.settings?.tolerateShortMovements ?? true,
+          cutoffTimestampMs: file.settings?.cutoffTimestampMs ?? undefined,
+          enableMapMatching: file.settings?.enableMapMatching ?? false,
+          googleApiKey: file.settings?.googleApiKey ?? undefined,
+          densifyIntervalM: Number(file.settings?.densifyIntervalM ?? 0),
+          elevationSmoothingRadius: Number(file.settings?.elevationSmoothingRadius ?? 200),
+        };
+
+        const result = await analyzeGPXData(file.content, parsedSettings);
+        if (!result.success) {
+          return res.status(400).json({
+            success: false,
+            error: `File "${file.filename}": ${result.error || 'Analysis failed'}`,
+          });
+        }
+        results.push({
+          filename: file.filename,
+          summary: result.summary,
+        });
+      }
+
+      return res.json({ results });
+    } catch (error: any) {
+      console.error('Compare error in endpoint:', error);
+      return res.status(500).json({
+        success: false,
+        error: `Comparison error: ${error.message || error}`,
       });
     }
   });

@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AnalysisSettings, DetectionMethod } from '../types';
+import { parseDatetimeLocal } from '../utils';
 import { Upload, FileCode, Sliders, ChevronDown, ChevronUp, AlertCircle, HelpCircle, Clock, ExternalLink, X } from 'lucide-react';
 import { ProgressBar } from './ProgressBar';
 import { useAuth } from './AuthContext';
@@ -28,6 +29,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
   const [tolerateShortMovements, setTolerateShortMovements] = useState<boolean>(true);
   const [enableMapMatching, setEnableMapMatching] = useState<boolean>(true);
   const [densifyIntervalM, setDensifyIntervalM] = useState<number>(150);
+  const [elevationSmoothingRadius, setElevationSmoothingRadius] = useState<number>(200);
   const [googleApiKey, setGoogleApiKey] = useState<string>(() => {
     try { return localStorage.getItem('gpx-google-api-key') || ''; } catch { return ''; }
   });
@@ -40,7 +42,7 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
   const [cutoffEnabled, setCutoffEnabled] = useState<boolean>(true);
   const [cutoffTime, setCutoffTime] = useState<string>('2026-07-04T12:50');
   const [savedCutoffMs, setSavedCutoffMs] = useState<number | null>(
-    new Date('2026-07-04T12:50').getTime()
+    parseDatetimeLocal('2026-07-04T12:50')
   );
 
   // File Upload States
@@ -239,12 +241,13 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
       enableMapMatching,
       googleApiKey: enableMapMatching ? googleApiKey : undefined,
       densifyIntervalM: enableMapMatching ? densifyIntervalM : undefined,
+      elevationSmoothingRadius,
     });
   };
 
   const handleSaveCutoff = () => {
     if (cutoffTime) {
-      setSavedCutoffMs(new Date(cutoffTime).getTime());
+      setSavedCutoffMs(parseDatetimeLocal(cutoffTime));
     } else {
       setSavedCutoffMs(null);
     }
@@ -611,6 +614,28 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
                       />
                         <p className="text-[10px] text-[#6B7280] leading-normal">
                           Control point spacing before Map Matching (50m–1km).
+                        </p>
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-xs mt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-700">
+                          Elevation Smoothing
+                        </span>
+                        <span className="font-mono font-bold text-[#2563EB]">
+                          {elevationSmoothingRadius === 0 ? 'Off' : `${elevationSmoothingRadius}m`}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1000"
+                        step="50"
+                        value={elevationSmoothingRadius}
+                        onChange={(e) => setElevationSmoothingRadius(Number(e.target.value))}
+                        className="w-full accent-[#2563EB] h-1.5"
+                      />
+                        <p className="text-[10px] text-[#6B7280] leading-normal">
+                          Gaussian smoothing radius for GPS elevation data (0=off, 200m default).
                         </p>
                     </label>
                   </div>
