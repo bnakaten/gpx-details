@@ -655,7 +655,7 @@ export async function analyzeGPXData(xmlContent: string, settings: AnalysisSetti
 
 function smoothElevationOutliers(points: GPXPoint[]): void {
   const WINDOW_M = 4000;
-  const MAX_GAIN_M = 2000;
+  const MAX_GAIN_M = 1000;
 
   const outlierFlags: boolean[] = new Array(points.length).fill(false);
 
