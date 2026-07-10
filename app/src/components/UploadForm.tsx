@@ -270,21 +270,21 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
 
         {/* Trigger Button */}
         <div className="border-b border-[#E5E7EB] pb-4">
-          <button
-            onClick={handleSubmit}
-            disabled={!uploadedFile || isLoading}
-            className={`w-full py-2.5 px-4 rounded font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer ${
-              uploadedFile && !isLoading
-                ? 'bg-[#2563EB] text-white hover:bg-blue-700'
-                : 'bg-[#F9FAFB] text-slate-300 border border-[#E5E7EB] cursor-not-allowed'
-            }`}
-          >
-            {isLoading ? (
-              <span>Analyzing...</span>
-            ) : (
+          {isLoading ? (
+            <ProgressBar value={0} phase="analyzing" />
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={!uploadedFile}
+              className={`w-full py-2.5 px-4 rounded font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer ${
+                uploadedFile
+                  ? 'bg-[#2563EB] text-white hover:bg-blue-700'
+                  : 'bg-[#F9FAFB] text-slate-300 border border-[#E5E7EB] cursor-not-allowed'
+              }`}
+            >
               <span>Start Analysis</span>
-            )}
-          </button>
+            </button>
+          )}
         </div>
 
         {/* Strava Activity Selector */}
