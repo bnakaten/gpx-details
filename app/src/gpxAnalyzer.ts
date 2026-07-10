@@ -842,24 +842,33 @@ function computeDailyBreakdown(points: GPXPoint[], stops: GPXStop[]): DaySummary
       }
     }
 
-    let dayStopTimeMs = 0;
-    let dayStopCount = 0;
     const [y, m, d] = date.split('-').map(Number);
     const dayMidnightMs = new Date(y, m - 1, d).getTime();
     const nextMidnightMs = dayMidnightMs + 24 * 60 * 60 * 1000;
+
+    let dayStopTimeMs = 0;
+    let dayStopCount = 0;
+    let dayRecordingStopTimeMs = 0;
     for (const stop of stops) {
       const stopStartMs = new Date(stop.startTime).getTime();
       const stopEndMs = new Date(stop.endTime).getTime();
-      const overlapStart = Math.max(stopStartMs, dayMidnightMs);
-      const overlapEnd = Math.min(stopEndMs, nextMidnightMs);
-      if (overlapEnd > overlapStart) {
-        dayStopTimeMs += overlapEnd - overlapStart;
+
+      const calendarOverlapStart = Math.max(stopStartMs, dayMidnightMs);
+      const calendarOverlapEnd = Math.min(stopEndMs, nextMidnightMs);
+      if (calendarOverlapEnd > calendarOverlapStart) {
+        dayStopTimeMs += calendarOverlapEnd - calendarOverlapStart;
         dayStopCount++;
+      }
+
+      const recordingOverlapStart = Math.max(stopStartMs, dayStartMs);
+      const recordingOverlapEnd = Math.min(stopEndMs, dayEndMs);
+      if (recordingOverlapEnd > recordingOverlapStart) {
+        dayRecordingStopTimeMs += recordingOverlapEnd - recordingOverlapStart;
       }
     }
 
     const dayTimeMs = dayEndMs - dayStartMs;
-    const dayMovingTimeMs = Math.max(0, dayTimeMs - dayStopTimeMs);
+    const dayMovingTimeMs = Math.max(0, dayTimeMs - dayRecordingStopTimeMs);
     const dayMovingTimeSec = dayMovingTimeMs / 1000;
     const avgSpeed = dayMovingTimeSec > 0 ? (dayDistanceM / dayMovingTimeSec) * 3.6 : 0;
 

@@ -367,7 +367,6 @@ async function matchPointsToRoad(points, apiKey) {
         throw new Error(`API error: ${rawData.error.message || JSON.stringify(rawData.error)}`);
       }
       const data = rawData;
-      console.log(`[Google Roads] batch ${batchStart}: got ${data.snappedPoints?.length || 0} snapped points`);
       if (!data.snappedPoints || data.snappedPoints.length === 0) throw new Error("No snapped points returned");
       const resultPts = [];
       let currentOi = -1;
@@ -861,23 +860,29 @@ function computeDailyBreakdown(points, stops) {
         }
       }
     }
-    let dayStopTimeMs = 0;
-    let dayStopCount = 0;
     const [y, m, d] = date.split("-").map(Number);
     const dayMidnightMs = new Date(y, m - 1, d).getTime();
     const nextMidnightMs = dayMidnightMs + 24 * 60 * 60 * 1e3;
+    let dayStopTimeMs = 0;
+    let dayStopCount = 0;
+    let dayRecordingStopTimeMs = 0;
     for (const stop of stops) {
       const stopStartMs = new Date(stop.startTime).getTime();
       const stopEndMs = new Date(stop.endTime).getTime();
-      const overlapStart = Math.max(stopStartMs, dayMidnightMs);
-      const overlapEnd = Math.min(stopEndMs, nextMidnightMs);
-      if (overlapEnd > overlapStart) {
-        dayStopTimeMs += overlapEnd - overlapStart;
+      const calendarOverlapStart = Math.max(stopStartMs, dayMidnightMs);
+      const calendarOverlapEnd = Math.min(stopEndMs, nextMidnightMs);
+      if (calendarOverlapEnd > calendarOverlapStart) {
+        dayStopTimeMs += calendarOverlapEnd - calendarOverlapStart;
         dayStopCount++;
+      }
+      const recordingOverlapStart = Math.max(stopStartMs, dayStartMs);
+      const recordingOverlapEnd = Math.min(stopEndMs, dayEndMs);
+      if (recordingOverlapEnd > recordingOverlapStart) {
+        dayRecordingStopTimeMs += recordingOverlapEnd - recordingOverlapStart;
       }
     }
     const dayTimeMs = dayEndMs - dayStartMs;
-    const dayMovingTimeMs = Math.max(0, dayTimeMs - dayStopTimeMs);
+    const dayMovingTimeMs = Math.max(0, dayTimeMs - dayRecordingStopTimeMs);
     const dayMovingTimeSec = dayMovingTimeMs / 1e3;
     const avgSpeed = dayMovingTimeSec > 0 ? dayDistanceM / dayMovingTimeSec * 3.6 : 0;
     return {
