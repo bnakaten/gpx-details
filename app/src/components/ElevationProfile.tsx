@@ -43,7 +43,11 @@ function computeXTicks(minDist: number, maxDist: number): { label: string; distM
   else if (totalKm <= 20) step = 2;
   else if (totalKm <= 50) step = 5;
   else if (totalKm <= 100) step = 10;
-  else step = 20;
+  else if (totalKm <= 200) step = 20;
+  else if (totalKm <= 500) step = 50;
+  else if (totalKm <= 1000) step = 100;
+  else if (totalKm <= 3000) step = 200;
+  else step = 500;
 
   const ticks: { label: string; distM: number }[] = [];
   const startKm = Math.floor(minDist / 1000 / step) * step;
@@ -97,8 +101,13 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ points, tota
     : withElevation;
   if (visible.length < 2) return null;
 
-  const minEle = Math.min(...visible.map(p => p.ele!));
-  const maxEle = Math.max(...visible.map(p => p.ele!));
+  let minEle = Infinity;
+  let maxEle = -Infinity;
+  for (let i = 0; i < visible.length; i++) {
+    const e = visible[i].ele!;
+    if (e < minEle) minEle = e;
+    if (e > maxEle) maxEle = e;
+  }
   const eleRange = maxEle - minEle || 1;
 
   const linePoints = visible

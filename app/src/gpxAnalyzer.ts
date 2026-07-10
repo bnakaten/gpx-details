@@ -4,7 +4,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { GPXPoint, GPXStop, AnalysisSettings, AnalysisResponse, AnalysisSummary } from './types';
+import { GPXPoint, GPXStop, AnalysisSettings, AnalysisResponse, AnalysisSummary, DaySummary } from './types';
 
 // Haversine formula to calculate the distance between two GPS coordinates in meters
 export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -635,6 +635,7 @@ export async function analyzeGPXData(xmlContent: string, settings: AnalysisSetti
       totalElevationGainM: Math.round(totalElevationGain),
       stopCount: stops.length,
       stopRatioPercent: totalTrackDurationMs > 0 ? Math.round((totalStopMs / totalTrackDurationMs) * 100) : 0,
+      dailyBreakdown: computeDailyBreakdown(smoothedPoints, stops),
     };
 
     return {
@@ -793,6 +794,85 @@ function smoothElevationGaussian(points: GPXPoint[], radiusM: number): GPXPoint[
   return points;
 }
 
+function computeDailyBreakdown(points: GPXPoint[], stops: GPXStop[]): DaySummary[] {
+  if (points.length === 0) return [];
+
+  const getDateKey = (ms: number) => {
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const dateGroups = new Map<string, GPXPoint[]>();
+  for (const p of points) {
+    const date = getDateKey(p.timestampMs);
+    let group = dateGroups.get(date);
+    if (!group) {
+      group = [];
+      dateGroups.set(date, group);
+    }
+    group.push(p);
+  }
+
+  const sortedDates = Array.from(dateGroups.keys()).sort();
+
+  return sortedDates.map((date) => {
+    const dayPoints = dateGroups.get(date)!;
+    const firstPt = dayPoints[0];
+    const lastPt = dayPoints[dayPoints.length - 1];
+
+    const dayStartMs = firstPt.timestampMs;
+    const dayEndMs = lastPt.timestampMs;
+
+    let dayDistanceM = 0;
+    let dayElevationGain = 0;
+    for (let i = 0; i < dayPoints.length; i++) {
+      const p = dayPoints[i];
+      if (p.distanceFromPrev !== undefined && p.distanceFromPrev > 0) {
+        dayDistanceM += p.distanceFromPrev;
+      }
+      if (i > 0) {
+        const prev = dayPoints[i - 1].ele;
+        const curr = p.ele;
+        if (
+          prev !== undefined && !Number.isNaN(prev) &&
+          curr !== undefined && !Number.isNaN(curr) &&
+          curr > prev
+        ) {
+          dayElevationGain += curr - prev;
+        }
+      }
+    }
+
+    let dayStopTimeMs = 0;
+    let dayStopCount = 0;
+    for (const stop of stops) {
+      const stopStartMs = new Date(stop.startTime).getTime();
+      const stopEndMs = new Date(stop.endTime).getTime();
+      const overlapStart = Math.max(stopStartMs, dayStartMs);
+      const overlapEnd = Math.min(stopEndMs, dayEndMs);
+      if (overlapEnd > overlapStart) {
+        dayStopTimeMs += overlapEnd - overlapStart;
+        dayStopCount++;
+      }
+    }
+
+    const dayTimeMs = dayEndMs - dayStartMs;
+    const dayMovingTimeMs = Math.max(0, dayTimeMs - dayStopTimeMs);
+    const dayMovingTimeSec = dayMovingTimeMs / 1000;
+    const avgSpeed = dayMovingTimeSec > 0 ? (dayDistanceM / dayMovingTimeSec) * 3.6 : 0;
+
+    return {
+      date,
+      distanceKm: Math.round(dayDistanceM / 100) / 10,
+      elevationGainM: Math.round(dayElevationGain),
+      movingTimeMs: dayMovingTimeMs,
+      stopTimeMs: dayStopTimeMs,
+      avgSpeedKmh: Number.isFinite(avgSpeed) ? Math.round(avgSpeed * 10) / 10 : 0,
+      stopCount: dayStopCount,
+    };
+  });
+}
+
 function createEmptySummary(): AnalysisSummary {
   return {
     totalStopDurationMs: 0,
@@ -804,5 +884,6 @@ function createEmptySummary(): AnalysisSummary {
     totalElevationGainM: 0,
     stopCount: 0,
     stopRatioPercent: 0,
+    dailyBreakdown: [],
   };
 }

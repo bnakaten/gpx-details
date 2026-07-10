@@ -71,6 +71,16 @@ export interface AnalysisRequest {
   settings: AnalysisSettings;
 }
 
+export interface DaySummary {
+  date: string;
+  distanceKm: number;
+  elevationGainM: number;
+  movingTimeMs: number;
+  stopTimeMs: number;
+  avgSpeedKmh: number;
+  stopCount: number;
+}
+
 export interface AnalysisSummary {
   totalStopDurationMs: number;
   totalStopDurationFormatted: string;
@@ -80,7 +90,8 @@ export interface AnalysisSummary {
   totalDistanceMeters: number;
   totalElevationGainM: number;
   stopCount: number;
-  stopRatioPercent: number; // Percentage of time spent stationary
+  stopRatioPercent: number;
+  dailyBreakdown: DaySummary[];
 }
 
 export interface AnalysisResponse {

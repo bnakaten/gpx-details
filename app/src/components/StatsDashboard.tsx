@@ -6,6 +6,7 @@
 import React from 'react';
 import { AnalysisSummary, GPXStop } from '../types';
 import { Clock, Navigation, Bike, Moon, ShieldAlert } from 'lucide-react';
+import { DailyBreakdown } from './DailyBreakdown';
 
 interface StatsDashboardProps {
   summary: AnalysisSummary;
@@ -136,6 +137,9 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
           )}
         </div>
       </div>
+
+      {/* 3. Daily Breakdown */}
+      <DailyBreakdown days={summary.dailyBreakdown} />
     </div>
   );
 }
