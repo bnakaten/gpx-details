@@ -141,6 +141,8 @@ export function UploadForm({ onAnalyze, isLoading, error, demoFile, expandOption
 
       const name = activity ? `${activity.name}.gpx` : `strava_${id}.gpx`;
       setUploadedFile({ name, content: data.gpx, size: '' });
+      setCutoffEnabled(false);
+      setEnableMapMatching(false);
     } catch (err: any) {
       setStravaError(err.message);
     } finally {
