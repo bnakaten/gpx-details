@@ -678,18 +678,20 @@ async function analyzeGPXData(xmlContent, settings) {
         idx++;
       }
     }
+    fixElevationOutliers(points, 1e4, 2e3);
+    const smoothedPoints = smoothElevationGaussian(points, settings.elevationSmoothingRadius ?? 200);
     let totalStopMs = 0;
     for (const stop of stops) {
       totalStopMs += stop.durationMs;
     }
-    const firstPt = points[0];
-    const lastPt = points[points.length - 1];
+    const firstPt = smoothedPoints[0];
+    const lastPt = smoothedPoints[smoothedPoints.length - 1];
     const totalTrackDurationMs = lastPt.timestampMs - firstPt.timestampMs;
     const totalDistance = lastPt.cumulativeDistance || 0;
     let totalElevationGain = 0;
-    for (let i = 1; i < points.length; i++) {
-      const prevEle = points[i - 1].ele;
-      const currEle = points[i].ele;
+    for (let i = 1; i < smoothedPoints.length; i++) {
+      const prevEle = smoothedPoints[i - 1].ele;
+      const currEle = smoothedPoints[i].ele;
       if (prevEle !== void 0 && currEle !== void 0 && currEle > prevEle) {
         totalElevationGain += currEle - prevEle;
       }
@@ -703,11 +705,12 @@ async function analyzeGPXData(xmlContent, settings) {
       totalDistanceMeters: Math.round(totalDistance),
       totalElevationGainM: Math.round(totalElevationGain),
       stopCount: stops.length,
-      stopRatioPercent: totalTrackDurationMs > 0 ? Math.round(totalStopMs / totalTrackDurationMs * 100) : 0
+      stopRatioPercent: totalTrackDurationMs > 0 ? Math.round(totalStopMs / totalTrackDurationMs * 100) : 0,
+      dailyBreakdown: computeDailyBreakdown(smoothedPoints, stops)
     };
     return {
       success: true,
-      points,
+      points: smoothedPoints,
       rawPoints,
       stops,
       summary
@@ -722,6 +725,172 @@ async function analyzeGPXData(xmlContent, settings) {
     };
   }
 }
+function fixElevationOutliers(points, windowM, maxGainM) {
+  if (points.length < 2) return;
+  const anomaly = new Array(points.length).fill(false);
+  for (let i = 0; i < points.length; i++) {
+    const startDist = points[i].cumulativeDistance || 0;
+    let gain = 0;
+    let prevEle = points[i].ele;
+    let jEnd = i;
+    for (let j = i + 1; j < points.length; j++) {
+      const distEnd = points[j].cumulativeDistance || 0;
+      if (distEnd - startDist > windowM) break;
+      jEnd = j;
+      const currEle = points[j].ele;
+      if (prevEle !== void 0 && currEle !== void 0 && currEle > prevEle) {
+        gain += currEle - prevEle;
+      }
+      prevEle = currEle;
+    }
+    if (jEnd > i && gain > maxGainM) {
+      for (let k = i; k <= jEnd; k++) {
+        anomaly[k] = true;
+      }
+    }
+  }
+  let sectionStart = -1;
+  for (let i = 0; i <= points.length; i++) {
+    if (i < points.length && anomaly[i]) {
+      if (sectionStart === -1) sectionStart = i;
+    } else {
+      if (sectionStart !== -1) {
+        const sectionEnd = i - 1;
+        let eleBefore;
+        let distBefore;
+        for (let k = sectionStart - 1; k >= 0; k--) {
+          if (!anomaly[k] && points[k].ele !== void 0) {
+            eleBefore = points[k].ele;
+            distBefore = points[k].cumulativeDistance || 0;
+            break;
+          }
+        }
+        let eleAfter;
+        let distAfter;
+        for (let k = sectionEnd + 1; k < points.length; k++) {
+          if (!anomaly[k] && points[k].ele !== void 0) {
+            eleAfter = points[k].ele;
+            distAfter = points[k].cumulativeDistance || 0;
+            break;
+          }
+        }
+        for (let k = sectionStart; k <= sectionEnd; k++) {
+          const kDist = points[k].cumulativeDistance || 0;
+          if (eleBefore !== void 0 && eleAfter !== void 0 && distAfter !== distBefore) {
+            const t = (kDist - distBefore) / (distAfter - distBefore);
+            points[k].ele = eleBefore + (eleAfter - eleBefore) * t;
+          } else if (eleBefore !== void 0) {
+            points[k].ele = eleBefore;
+          } else if (eleAfter !== void 0) {
+            points[k].ele = eleAfter;
+          }
+        }
+        sectionStart = -1;
+      }
+    }
+  }
+}
+function smoothElevationGaussian(points, radiusM) {
+  if (points.length < 2 || radiusM <= 0) return points;
+  const sigma = radiusM;
+  const sigmaSq2 = 2 * sigma * sigma;
+  const windowRadius = 3 * sigma;
+  for (let i = 0; i < points.length; i++) {
+    const distI = points[i].cumulativeDistance || 0;
+    let weightSum = 0;
+    let elevSum = 0;
+    for (let j = i; j >= 0; j--) {
+      const distJ = points[j].cumulativeDistance || 0;
+      if (distI - distJ > windowRadius) break;
+      if (points[j].ele === void 0) continue;
+      const d = distI - distJ;
+      const w = Math.exp(-(d * d) / sigmaSq2);
+      weightSum += w;
+      elevSum += w * points[j].ele;
+    }
+    for (let j = i + 1; j < points.length; j++) {
+      const distJ = points[j].cumulativeDistance || 0;
+      if (distJ - distI > windowRadius) break;
+      if (points[j].ele === void 0) continue;
+      const d = distJ - distI;
+      const w = Math.exp(-(d * d) / sigmaSq2);
+      weightSum += w;
+      elevSum += w * points[j].ele;
+    }
+    if (weightSum > 0) {
+      points[i].ele = elevSum / weightSum;
+    }
+  }
+  return points;
+}
+function computeDailyBreakdown(points, stops) {
+  if (points.length === 0) return [];
+  const getDateKey = (ms) => {
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const dateGroups = /* @__PURE__ */ new Map();
+  for (const p of points) {
+    const date = getDateKey(p.timestampMs);
+    let group = dateGroups.get(date);
+    if (!group) {
+      group = [];
+      dateGroups.set(date, group);
+    }
+    group.push(p);
+  }
+  const sortedDates = Array.from(dateGroups.keys()).sort();
+  return sortedDates.map((date) => {
+    const dayPoints = dateGroups.get(date);
+    const firstPt = dayPoints[0];
+    const lastPt = dayPoints[dayPoints.length - 1];
+    const dayStartMs = firstPt.timestampMs;
+    const dayEndMs = lastPt.timestampMs;
+    let dayDistanceM = 0;
+    let dayElevationGain = 0;
+    for (let i = 0; i < dayPoints.length; i++) {
+      const p = dayPoints[i];
+      if (p.distanceFromPrev !== void 0 && p.distanceFromPrev > 0) {
+        dayDistanceM += p.distanceFromPrev;
+      }
+      if (i > 0) {
+        const prev = dayPoints[i - 1].ele;
+        const curr = p.ele;
+        if (prev !== void 0 && !Number.isNaN(prev) && curr !== void 0 && !Number.isNaN(curr) && curr > prev) {
+          dayElevationGain += curr - prev;
+        }
+      }
+    }
+    let dayStopTimeMs = 0;
+    let dayStopCount = 0;
+    const [y, m, d] = date.split("-").map(Number);
+    const dayMidnightMs = new Date(y, m - 1, d).getTime();
+    const nextMidnightMs = dayMidnightMs + 24 * 60 * 60 * 1e3;
+    for (const stop of stops) {
+      const stopStartMs = new Date(stop.startTime).getTime();
+      const stopEndMs = new Date(stop.endTime).getTime();
+      const overlapStart = Math.max(stopStartMs, dayMidnightMs);
+      const overlapEnd = Math.min(stopEndMs, nextMidnightMs);
+      if (overlapEnd > overlapStart) {
+        dayStopTimeMs += overlapEnd - overlapStart;
+        dayStopCount++;
+      }
+    }
+    const dayTimeMs = dayEndMs - dayStartMs;
+    const dayMovingTimeMs = Math.max(0, dayTimeMs - dayStopTimeMs);
+    const dayMovingTimeSec = dayMovingTimeMs / 1e3;
+    const avgSpeed = dayMovingTimeSec > 0 ? dayDistanceM / dayMovingTimeSec * 3.6 : 0;
+    return {
+      date,
+      distanceKm: Math.round(dayDistanceM / 100) / 10,
+      elevationGainM: Math.round(dayElevationGain),
+      movingTimeMs: dayMovingTimeMs,
+      stopTimeMs: dayStopTimeMs,
+      avgSpeedKmh: Number.isFinite(avgSpeed) ? Math.round(avgSpeed * 10) / 10 : 0,
+      stopCount: dayStopCount
+    };
+  });
+}
 function createEmptySummary() {
   return {
     totalStopDurationMs: 0,
@@ -732,7 +901,8 @@ function createEmptySummary() {
     totalDistanceMeters: 0,
     totalElevationGainM: 0,
     stopCount: 0,
-    stopRatioPercent: 0
+    stopRatioPercent: 0,
+    dailyBreakdown: []
   };
 }
 
@@ -1112,7 +1282,8 @@ async function startServer() {
         cutoffTimestampMs: settings?.cutoffTimestampMs ?? void 0,
         enableMapMatching: settings?.enableMapMatching ?? false,
         googleApiKey: settings?.googleApiKey ?? void 0,
-        densifyIntervalM: Number(settings?.densifyIntervalM ?? 0)
+        densifyIntervalM: Number(settings?.densifyIntervalM ?? 0),
+        elevationSmoothingRadius: Number(settings?.elevationSmoothingRadius ?? 200)
       };
       const result = await analyzeGPXData(content, parsedSettings);
       return res.json(result);
@@ -1127,10 +1298,10 @@ async function startServer() {
   app.post("/api/history/compare", optionalAuth, async (req, res) => {
     try {
       const { files } = req.body;
-      if (!Array.isArray(files) || files.length < 2 || files.length > 5) {
+      if (!Array.isArray(files) || files.length < 2) {
         return res.status(400).json({
           success: false,
-          error: "Provide 2\u20135 files for comparison."
+          error: "Provide at least 2 files for comparison."
         });
       }
       const results = [];
@@ -1150,7 +1321,8 @@ async function startServer() {
           cutoffTimestampMs: file.settings?.cutoffTimestampMs ?? void 0,
           enableMapMatching: file.settings?.enableMapMatching ?? false,
           googleApiKey: file.settings?.googleApiKey ?? void 0,
-          densifyIntervalM: Number(file.settings?.densifyIntervalM ?? 0)
+          densifyIntervalM: Number(file.settings?.densifyIntervalM ?? 0),
+          elevationSmoothingRadius: Number(file.settings?.elevationSmoothingRadius ?? 200)
         };
         const result = await analyzeGPXData(file.content, parsedSettings);
         if (!result.success) {

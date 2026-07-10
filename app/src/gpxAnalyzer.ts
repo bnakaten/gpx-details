@@ -196,7 +196,6 @@ async function matchPointsToRoad(points: GPXPoint[], apiKey: string): Promise<GP
         throw new Error(`API error: ${rawData.error.message || JSON.stringify(rawData.error)}`);
       }
       const data = rawData as { snappedPoints?: Array<{ location: { latitude: number; longitude: number }; originalIndex: number }> };
-      console.log(`[Google Roads] batch ${batchStart}: got ${data.snappedPoints?.length || 0} snapped points`);
       if (!data.snappedPoints || data.snappedPoints.length === 0) throw new Error('No snapped points returned');
 
       const resultPts: Array<{ lat: number; lon: number; originalIndex: number }> = [];
@@ -845,11 +844,14 @@ function computeDailyBreakdown(points: GPXPoint[], stops: GPXStop[]): DaySummary
 
     let dayStopTimeMs = 0;
     let dayStopCount = 0;
+    const [y, m, d] = date.split('-').map(Number);
+    const dayMidnightMs = new Date(y, m - 1, d).getTime();
+    const nextMidnightMs = dayMidnightMs + 24 * 60 * 60 * 1000;
     for (const stop of stops) {
       const stopStartMs = new Date(stop.startTime).getTime();
       const stopEndMs = new Date(stop.endTime).getTime();
-      const overlapStart = Math.max(stopStartMs, dayStartMs);
-      const overlapEnd = Math.min(stopEndMs, dayEndMs);
+      const overlapStart = Math.max(stopStartMs, dayMidnightMs);
+      const overlapEnd = Math.min(stopEndMs, nextMidnightMs);
       if (overlapEnd > overlapStart) {
         dayStopTimeMs += overlapEnd - overlapStart;
         dayStopCount++;
