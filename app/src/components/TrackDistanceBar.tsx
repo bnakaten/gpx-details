@@ -16,7 +16,8 @@ const BAR_HEIGHT = 8;
 const MARKER_HEIGHT = 18;
 const TICK_HEIGHT = 6;
 const SVG_PADDING = 20;
-const SVG_HEIGHT = 52;
+const SVG_HEIGHT = 62;
+const LEGEND_Y = 4;
 
 function computeTicks(totalKm: number): number[] {
   let step: number;
@@ -83,7 +84,7 @@ export function TrackDistanceBar({ points, stops, totalDistanceMeters }: TrackDi
     setTooltipPos({ x: e.clientX, y: e.clientY });
   };
 
-  const barY = 8;
+  const barY = 18;
   const tickY = barY + BAR_HEIGHT;
 
   return (
@@ -123,6 +124,15 @@ export function TrackDistanceBar({ points, stops, totalDistanceMeters }: TrackDi
               fill="#e5e7eb"
               rx={BAR_HEIGHT / 2}
             />
+
+            {/* Legend */}
+            <rect x={SVG_PADDING} y={LEGEND_Y} width={10} height={5} fill="#e5e7eb" rx={2.5} />
+            <text x={SVG_PADDING + 13} y={LEGEND_Y + 5} fontSize={8} fill="#6b7280" fontFamily="system-ui, sans-serif">Fahrt</text>
+            <rect x={SVG_PADDING + 42} y={LEGEND_Y} width={10} height={5} fill="#dc2626" rx={2.5} />
+            <text x={SVG_PADDING + 55} y={LEGEND_Y + 5} fontSize={8} fill="#6b7280" fontFamily="system-ui, sans-serif">Pause</text>
+
+            {/* Axis unit */}
+            <text x={svgWidth - SVG_PADDING + 4} y={tickY + TICK_HEIGHT + 10} fontSize={8} fill="#9ca3af" fontFamily="system-ui, sans-serif" textAnchor="start">km</text>
 
             {/* Break markers */}
             {stops.map((stop) => {
