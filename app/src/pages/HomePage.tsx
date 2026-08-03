@@ -10,6 +10,7 @@ import { DEMO_GPX_XML } from '../demoGPX';
 import { UploadForm } from '../components/UploadForm';
 import { StatsDashboard } from '../components/StatsDashboard';
 import { TrackDistanceBar } from '../components/TrackDistanceBar';
+import { BreakFrequencyChart } from '../components/BreakFrequencyChart';
 import { MapContainer } from '../components/MapContainer';
 import { StopList } from '../components/StopList';
 import { ElevationProfile } from '../components/ElevationProfile';
@@ -214,11 +215,18 @@ export default function HomePage() {
           )}
 
           {points.length > 0 && (
-            <TrackDistanceBar
-              points={points}
-              stops={stops}
-              totalDistanceMeters={summary?.totalDistanceMeters ?? 0}
-            />
+            <div className="flex gap-3 items-start">
+              <div className="flex-1 min-w-0">
+                <TrackDistanceBar
+                  points={points}
+                  stops={stops}
+                  totalDistanceMeters={summary?.totalDistanceMeters ?? 0}
+                />
+              </div>
+              <div className="w-[260px] shrink-0">
+                <BreakFrequencyChart stops={stops} />
+              </div>
+            </div>
           )}
 
           <div className="h-[450px] md:h-[500px] w-full min-h-[300px] shrink-0">
