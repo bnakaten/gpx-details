@@ -9,6 +9,7 @@ import { AnalysisResponse, AnalysisSettings, GPXPoint, GPXStop } from '../types'
 import { DEMO_GPX_XML } from '../demoGPX';
 import { UploadForm } from '../components/UploadForm';
 import { StatsDashboard } from '../components/StatsDashboard';
+import { TrackDistanceBar } from '../components/TrackDistanceBar';
 import { MapContainer } from '../components/MapContainer';
 import { StopList } from '../components/StopList';
 import { ElevationProfile } from '../components/ElevationProfile';
@@ -210,6 +211,14 @@ export default function HomePage() {
               </div>
               <StatsDashboard summary={summary} stops={stops} />
             </div>
+          )}
+
+          {points.length > 0 && (
+            <TrackDistanceBar
+              points={points}
+              stops={stops}
+              totalDistanceMeters={summary?.totalDistanceMeters ?? 0}
+            />
           )}
 
           <div className="h-[450px] md:h-[500px] w-full min-h-[300px] shrink-0">
