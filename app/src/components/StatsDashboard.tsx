@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { AnalysisSummary, GPXStop } from '../types';
+import { formatDurationLong, formatDurationHMSCompact } from '../utils';
 import { Clock, Navigation, Bike, Moon, ShieldAlert } from 'lucide-react';
 import { DailyBreakdown } from './DailyBreakdown';
 
@@ -26,35 +27,7 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
     ? (movementTimeMs / summary.totalTrackDurationMs) * 100
     : 0;
 
-  const formatMovementDuration = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
 
-    const displaySeconds = seconds % 60;
-    const displayMinutes = minutes % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${displayMinutes}m ${displaySeconds}s`;
-    }
-    if (minutes > 0) {
-      return `${displayMinutes}m ${displaySeconds}s`;
-    }
-    return `${displaySeconds}s`;
-  };
-  const formatTrackDuration = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    const displaySeconds = seconds % 60;
-    const displayMinutes = minutes % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${displayMinutes}m`;
-    }
-    return `${displayMinutes}m ${displaySeconds}s`;
-  };
 
   return (
     <div className="grid grid-cols-1 gap-4">
@@ -80,7 +53,7 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
                   <span className="text-[10px] text-[#6B7280]">{movementPercent.toFixed(0)}%</span>
                 </td>
                 <td className="relative text-center pb-1.5 align-middle">
-                  <span className="text-sm font-bold font-mono text-[#111827]">{formatMovementDuration(movementTimeMs)}</span>
+                  <span className="text-sm font-bold font-mono text-[#111827]" title={formatDurationHMSCompact(movementTimeMs)}>{formatDurationLong(movementTimeMs)}</span>
                   <span className="absolute right-0 top-1/2 -translate-y-1/2 text-sm font-bold font-mono text-rose-600">&empty; {avgSpeedKmh.toFixed(1)} km/h</span>
                 </td>
               </tr>
@@ -98,7 +71,7 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
                   <span className="text-[10px] text-[#6B7280]">{summary.stopRatioPercent}%</span>
                 </td>
                 <td className="text-center pt-1.5 align-middle">
-                  <span className="text-sm font-bold font-mono text-[#111827]">{summary.totalStopDurationFormatted}</span>
+                  <span className="text-sm font-bold font-mono text-[#111827]" title={summary.totalStopDurationFormatted}>{formatDurationLong(summary.totalStopDurationMs)}</span>
                 </td>
               </tr>
             </tbody>
@@ -124,8 +97,8 @@ export function StatsDashboard({ summary, stops }: StatsDashboardProps) {
             </div>
             <div className="ml-auto text-right">
               <p className="text-[10px] text-[#6B7280]">Duration:</p>
-              <p className="font-semibold text-slate-800 font-mono mt-0.5" title={formatTrackDuration(summary.totalTrackDurationMs)}>
-                {formatTrackDuration(summary.totalTrackDurationMs)}
+              <p className="font-semibold text-slate-800 font-mono mt-0.5" title={formatDurationHMSCompact(summary.totalTrackDurationMs)}>
+                {formatDurationLong(summary.totalTrackDurationMs)}
               </p>
             </div>
           </div>
